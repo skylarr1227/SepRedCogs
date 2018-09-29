@@ -1,10 +1,10 @@
 {
-    "AUTHOR" : "sep#0001",
-    "INSTALL_MSG" : "TEMP INSTALL MESSAGE FOR BotStats",
-    "NAME" : "BotStats",
-    "SHORT" : "TEMP SHORT FOR BotStats",
-    "DESCRIPTION" : "TEMP DESC FOR BotStats",
-    "TAGS" : ["utility"],
-    "REQUIREMENTS" : ["psutil", "hurry.filesize"],
-    "HIDDEN" : false
+    "author" : ["sep#0001"],
+    "install_msg" : "Thanks for installing Sep's BotStats! Type .stats to get started!",
+    "name" : "BotStats",
+    "short" : "Simple bot and system statistic (cpu, mem, etc)",
+    "description" : "Simple bot and system statistic (cpu, mem, etc)",
+    "tags" : ["utility"],
+    "requirements" : ["psutil", "hurry.filesize"],
+    "hidden" : false
 }

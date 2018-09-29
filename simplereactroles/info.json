@@ -1,10 +1,10 @@
 {
-    "AUTHOR" : "sep#0001",
-    "INSTALL_MSG" : "TEMP INSTALL MESSAGE FOR SimpleReactRoles",
-    "NAME" : "SimpleReactRoles",
-    "SHORT" : "TEMP SHORT FOR SimpleReactRoles",
-    "DESCRIPTION" : "TEMP DESC FOR SimpleReactRoles",
-    "TAGS" : ["reaction", "role", "utility"],
-    "REQUIREMENTS" : [],
-    "HIDDEN" : false
+    "author" : ["sep#0001"],
+    "install_msg" : "Welcome to Sep's SimpleReactRoles! Type .reactroles to get started!",
+    "name" : "SimpleReactRoles",
+    "short" : "Assign/remove roles based on user's reactions on messages.",
+    "description" : "Assign/remove roles based on user's reactions on messages.",
+    "tags" : ["reaction", "role", "utility"],
+    "requirements" : [],
+    "hidden" : false
 }

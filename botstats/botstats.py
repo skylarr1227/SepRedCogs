@@ -14,7 +14,7 @@ from redbot.core.bot import Red
 from redbot.core import commands
 from redbot.core.commands import Context
 
-from botstats.stat_helpers import StatHelpers
+from .stat_helpers import StatHelpers
 
 
 class BotStats(object):
