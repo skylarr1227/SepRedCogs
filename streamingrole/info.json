@@ -1,0 +1,10 @@
+{
+    "author" : ["sep#0001"],
+    "install_msg" : "Thanks for installing Sep's StreamingRole! Load the cog, then use the 'streamrorle' command to get started!",
+    "name" : "StreamingRole",
+    "short" : "Assign a role to a user",
+    "description" : "Simple bot and system statistic (cpu, mem, etc)",
+    "tags" : ["utility"],
+    "requirements" : [],
+    "hidden" : false
+}
