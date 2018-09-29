@@ -1,7 +1,6 @@
 import asyncio
 import hashlib
 import logging
-from collections import defaultdict
 from typing import Optional
 
 import discord
@@ -43,7 +42,18 @@ class StreamingRole(object):
         return config
 
     async def __init_cache(self):
-        asyncio.sleep(2)
+        await self.bot.wait_until_ready()
+
+        guilds = await self.config.all_guilds()
+
+        active_guilds = dict()
+
+        for guild_id, guild_dict in guilds.items():
+            stream_role_id = guild_dict.get("streaming_role")
+            if stream_role_id is not None:
+                active_guilds[guild_id] = stream_role_id
+
+        self.guild_role_cache = active_guilds
 
     @staticmethod
     def __register_config_entities(config: Config):
@@ -74,17 +84,25 @@ class StreamingRole(object):
         return ctx.guild.me.guild_permissions.manage_roles
 
     async def __get_streaming_role(self, guild: discord.Guild) -> Optional[discord.Role]:
-        role_id = await self.config.guild(guild).streaming_role()
+
+        # check the cache first
+        role_id = self.guild_role_cache.get(guild.id)
+        if role_id is None:
+            role_id = await self.config.guild(guild).streaming_role()
         if role_id is not None:
             return self.__get_role_by_id(guild=guild, role_id=role_id)
 
     async def __set_streaming_role(self, guild: discord.Guild, role: discord.Role):
+        # update the cache
+        self.guild_role_cache[guild.id] = role.id
         await self.config.guild(guild).streaming_role.set(role.id)
 
     async def __unset_streaming_role(self, guild: discord.Guild) -> Optional[discord.Role]:
-        current_role = self.__get_streaming_role(guild=guild)
+        current_role = await self.__get_streaming_role(guild=guild)
         if current_role is not None:
-            await self.config.guild(guild).streaming_role.set(None)
+            # pop it off the cache
+            self.guild_role_cache.pop(guild.id)
+            await self.config.guild(guild).clear()
         return current_role
 
     async def edit_streaming_role_loop(self):
