@@ -1,0 +1,49 @@
+# English Language Translation for SimpleReactRoles Red-DiscordBot Cog
+# Copyright (C) 2018 twitch.tv/seputaes
+# Seputaes <seputaes@live.com>, 2018.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"POT-Creation-Date: 2018-09-16 17:42-0700\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=cp1252\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: pygettext.py 1.5\n"
+
+
+#: strings.py:10
+msgid ":x: This bot does not have permission to manage roles on the server."
+msgstr ":x: This bot does not have permission to manage roles on the server."
+
+#: strings.py:11
+msgid ":x: This bot does not have permission to add reactions in that channel."
+msgstr ":x: This bot does not have permission to add reactions in that channel."
+
+#: strings.py:14
+msgid ":x: The specified channel is not part of a server."
+msgstr ":x: The specified channel is not part of a server."
+
+#: strings.py:15
+msgid ":x: A queue with the name `{}` already exists on the server."
+msgstr ":x: A queue with the name `{}` already exists on the server."
+
+#: strings.py:16
+msgid ":x: queue named `{}` doesn't exist on the server."
+msgstr ":x: queue named `{}` doesn't exist on the server."
+
+#: strings.py:22
+msgid ":white_check_mark: Successfully created a queue named `{}`."
+msgstr ":white_check_mark: Successfully created a queue named `{}`."
+
+#: strings.py:23
+msgid ":white_check_mark: Successfully deleted the queue named `{}`."
+msgstr ":white_check_mark: Successfully deleted the queue named `{}`."
+
+#: strings.py:28
+msgid "Permissions check passed."
+msgstr "Permissions check passed."
+
