@@ -1,0 +1,11 @@
+{
+    "author" : ["sep#0001"],
+    "type": "SHARED_LIBRARY",
+    "install_msg" : "Thanks for installing Sep's Helper library.",
+    "name" : "SepLib",
+    "short" : "Library with helper and utility classes for use in other cogs.",
+    "description" : "Library with helper and utility classes for use in other cogs.",
+    "tags" : ["library", "utility"],
+    "requirements" : [],
+    "hidden" : false
+}
