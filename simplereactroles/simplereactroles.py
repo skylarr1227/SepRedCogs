@@ -12,6 +12,7 @@ from redbot.core import commands, Config, checks
 from redbot.core.bot import Red
 from redbot.core.commands import Context
 
+from simplereactroles.embeds import SuccessEmbedReply, ErrorEmbedReply
 from .strings import ErrorStrings, MiscStrings, DateTimeStrings, SuccessStrings
 from .utils import Utils
 
@@ -508,14 +509,14 @@ class SimpleReactRoles(object):
 
         if not await self.__bot_can_manage_roles(ctx):
             self.logger.info(f"CREATE: Bot cannot manage roles in guild {ctx.guild.id}. Not proceeding.")
-            return await ctx.send(ErrorStrings.perm_not_manage_roles)
+            return await ErrorEmbedReply(ErrorStrings.perm_not_manage_roles).send(ctx)
 
         if await self.__get_queue(ctx, queue_name):
             self.logger.info(f"CREATE: Queue named {queue_name} exists in guild {ctx.guild.id}. Not proceeding.")
-            return await ctx.send(ErrorStrings.queue_exists_f.format(queue_name))
+            return await ErrorEmbedReply(ErrorStrings.queue_exists_f.format(queue_name)).send(ctx)
 
         await self.__create_queue(ctx=ctx, queue_name=queue_name)
-        await ctx.send(SuccessStrings.queue_created_f.format(queue_name))
+        await ctx.tick()
 
     @_reactroles.command(name="delete")
     @commands.guild_only()
@@ -527,14 +528,14 @@ class SimpleReactRoles(object):
 
         if not await self.__bot_can_manage_roles(ctx):
             self.logger.info(f"DELETE: Bot cannot manage roles in guild {ctx.guild.id}. Not proceeding.")
-            return await ctx.send(ErrorStrings.perm_not_manage_roles)
+            return await ErrorEmbedReply(ErrorStrings.perm_not_manage_roles).send(ctx)
 
         if not await self.__get_queue(ctx=ctx, queue_name=queue_name):
             self.logger.info(f"DELETE: Queue named {queue_name} doesn't exist in guild {ctx.guild.id}. Not proceeding.")
-            return await ctx.send(ErrorStrings.queue_not_exists_f.format(queue_name))
+            return await ErrorEmbedReply(ErrorStrings.queue_not_exists_f.format(queue_name)).send(ctx)
 
         await self.__delete_queue(ctx=ctx, queue_name=queue_name)
-        await ctx.send(SuccessStrings.queue_deleted_f.format(queue_name))
+        await ctx.tick()
 
     @_reactroles.command(name="map")
     @commands.guild_only()
@@ -546,7 +547,7 @@ class SimpleReactRoles(object):
         # confirm the queue exists
         if not await self.__get_queue(ctx=ctx, queue_name=queue_name):
             self.logger.info(f'MAP: Queue "{queue_name}" doesd not exist for guild {ctx.guild.id}.')
-            return await ctx.send(ErrorStrings.queue_not_exists_f.format(queue_name))
+            return await ErrorEmbedReply(ErrorStrings.queue_not_exists_f.format(queue_name)).send(ctx)
 
         emoji_id = self.__get_emoji_id(emoji)
         actual_emoji = emoji if not emoji_id.isdigit() else self.__find_bot_emoji(emoji_id)
@@ -555,7 +556,7 @@ class SimpleReactRoles(object):
         if actual_emoji is None:
             self.logger.info(f'MAP: g:{ctx.guild.id}|q:{queue_name} | '
                              f'Bot does not have access to requested emoji "{actual_emoji}. Not proceeding."')
-            return await ctx.send(ErrorStrings.emoji_bot_no_access_f.format(emoji))
+            return await ErrorEmbedReply(ErrorStrings.emoji_bot_no_access_f.format(emoji)).send(ctx)
 
         # check if the emoji already exists in the queue
         current_emojis = await self.__get_emojis_for_queue(ctx, queue_name)
@@ -564,10 +565,10 @@ class SimpleReactRoles(object):
                              f'Requested emoji "{actual_emoji}" already exists in the queue. Not proceeding.')
             role_id = current_emojis.get(emoji)
             role = discord.utils.get(ctx.guild.roles, id=int(role_id))  # type: discord.Role
-            return await ctx.send(ErrorStrings.emoji_exists_f.format(emoji, queue_name, role.name))
+            return await ErrorEmbedReply(ErrorStrings.emoji_exists_f.format(emoji, queue_name, role.name)).send(ctx)
 
         await self.__map_emoji(ctx=ctx, queue_name=queue_name, emoji=actual_emoji, role=role)
-        await ctx.send(SuccessStrings.emoji_added_f.format(role.name, emoji, queue_name))
+        await SuccessEmbedReply(SuccessStrings.emoji_added_f.format(role.name, emoji, queue_name)).send(ctx)
 
     @_reactroles.command(name="unmap")
     @commands.guild_only()
@@ -579,15 +580,15 @@ class SimpleReactRoles(object):
         # confirm the queue exists
         if not await self.__get_queue(ctx=ctx, queue_name=queue_name):
             self.logger.info(f'UNMAP: Queue "{queue_name}" does not exist for guild {ctx.guild.id}.')
-            return await ctx.send(ErrorStrings.queue_not_exists_f.format(queue_name))
+            return await ErrorEmbedReply(ErrorStrings.queue_not_exists_f.format(queue_name)).send(ctx)
 
         unset_success = await self.__unmap_emoji(ctx=ctx, queue_name=queue_name, emoji=emoji)
         if not unset_success:
             self.logger.info(f'UNMAP: g:{ctx.guild.id}|q:{queue_name} | '
                              f'Requested emoji "{emoji}" already does not exist in the queue. Not proceeding.')
-            return await ctx.send(ErrorStrings.emoji_not_exists_f.format(emoji, queue_name))
+            return await ErrorEmbedReply(ErrorStrings.emoji_not_exists_f.format(emoji, queue_name)).send(ctx)
 
-        await ctx.send(SuccessStrings.emoji_deleted_f.format(emoji, queue_name, unset_success))
+        await SuccessEmbedReply(SuccessStrings.emoji_deleted_f.format(emoji, queue_name, unset_success)).send(ctx)
 
     @_reactroles.command(name="activate")
     @commands.guild_only()
@@ -601,28 +602,28 @@ class SimpleReactRoles(object):
         # confirm the queue exists
         if not await self.__get_queue(ctx=ctx, queue_name=queue_name):
             self.logger.info(f'ACTIVATE: Queue "{queue_name}" does not exist for guild {ctx.guild.id}.')
-            return await ctx.send(ErrorStrings.queue_not_exists_f.format(queue_name))
+            return await ErrorEmbedReply(ErrorStrings.queue_not_exists_f.format(queue_name)).send(ctx)
 
         # confirm we have permissions in the channel specified
         perm_success, response = await self.__check_channel_permissions(channel=channel)
 
         if not perm_success:
             self.logger.info(f'ACTIVATE: Bot does not have proper permissions in channel {channel.id} | {response}.')
-            return await ctx.send(response)
+            return await ErrorEmbedReply(response).send(ctx)
 
         message = await self.__get_channel_message(channel=channel, message_id=message_id)
 
         if not message:
             error_message = ErrorStrings.message_not_found_f.format(message_id, channel.name)
             self.logger.info(f'ACTIVATE: {error_message}')
-            return await ctx.send(error_message)
+            return await ErrorEmbedReply(error_message).send(ctx)
 
         # the message is valid, so start adding reactions to it
         emojis = await self.__get_emojis_for_queue(ctx=ctx, queue_name=queue_name)
 
         if not emojis:
             self.logger.info("The queue has no mapped emojis. Not activating.")
-            return await ctx.send(ErrorStrings.activate_no_mapped_f.format(queue_name))
+            return await ErrorEmbedReply(ErrorStrings.activate_no_mapped_f.format(queue_name)).send(ctx)
 
         try:
             # add the reactions
@@ -637,15 +638,15 @@ class SimpleReactRoles(object):
             await self.__add_activated_reactions(message_id=message_id, channel=channel, emoji_map=emojis)
             await self.__delete_queue(ctx=ctx, queue_name=queue_name)
 
-            await ctx.send(SuccessStrings.activated_queue_f.format(queue_name, message_id, channel))
+            await SuccessEmbedReply(SuccessStrings.activated_queue_f.format(queue_name, message_id, channel)).send(ctx)
 
         except (discord.HTTPException, discord.Forbidden, discord.NotFound, discord.InvalidArgument) as de:
             self.logger.error(f"Error calling Discord add_reaction API.. "
                               f"Message:{message.id} | Channel: {channel.id} | Exception: {de}")
-            await ctx.send(ErrorStrings.discord_add_reaction_error)
+            await ErrorEmbedReply(ErrorStrings.discord_add_reaction_error).send(ctx)
         except Exception as ue:
             self.logger.error(f"Unknown Error: {ue}")
-            await ctx.send(ErrorStrings.unknown_error_check_logs)
+            await ErrorEmbedReply(ErrorStrings.unknown_error_check_logs).send(ctx)
 
     @_reactroles.command(name="deactivate")
     @commands.guild_only()
@@ -661,7 +662,7 @@ class SimpleReactRoles(object):
         if not message:
             error_message = ErrorStrings.message_not_found_f.format(message_id, channel.name)
             self.logger.info(f'{error_message}')
-            return await ctx.send(error_message)
+            return await ErrorEmbedReply(error_message).send(ctx)
 
         emojis = await self.__remove_activated_reactions(channel.id, message_id)
         self.logger.info(f"m:{message.id}|c:{channel.id} | Removed activated reaction roles.")
@@ -675,14 +676,14 @@ class SimpleReactRoles(object):
 
                 self.logger.info(f"m:{message.id}|c:{channel.id} | "
                                  f"Removed bot reactions from message: {api_emojis}")
-                await ctx.send(SuccessStrings.deactivated_queue_f.format(message_id, channel.name))
+                await SuccessEmbedReply(SuccessStrings.deactivated_queue_f.format(message_id, channel.name)).send(ctx)
             except (discord.HTTPException, discord.Forbidden, discord.NotFound, discord.InvalidArgument) as de:
                 self.logger.error(f"Error calling Discord remove_reaction API.. "
                                   f"Message:{message.id} | Channel: {channel.id} | Exception: {de}")
-                await ctx.send(ErrorStrings.discord_remove_reaction_error)
+                await ErrorEmbedReply(ErrorStrings.discord_remove_reaction_error).send(ctx)
             except Exception as ue:
                 self.logger.error(f"Unknown Error: {ue}")
-                await ctx.send(ErrorStrings.unknown_error_check_logs)
+                await ErrorEmbedReply(ErrorStrings.unknown_error_check_logs).send(ctx)
         else:
             self.logger.error(f"m:{message.id}|c:{channel.id} | Did not find any emojis in the queue for this message.")
-            await ctx.send(ErrorStrings.emoji_not_found_in_queue)
+            await ErrorEmbedReply(ErrorStrings.emoji_not_found_in_queue).send(ctx)
