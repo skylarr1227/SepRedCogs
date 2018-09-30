@@ -1,4 +1,4 @@
-from seplib.contsntats.colors import HexColors
+from ...constants.colors import HexColors
 from .embedreply import EmbedReply
 
 

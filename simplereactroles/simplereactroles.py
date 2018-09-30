@@ -12,7 +12,7 @@ from redbot.core import commands, Config, checks
 from redbot.core.bot import Red
 from redbot.core.commands import Context
 
-from seplib.responses.embeds import ErrorReply, SuccessReply
+from ..seplib.responses.embeds import ErrorReply, SuccessReply
 from .strings import ErrorStrings, MiscStrings, DateTimeStrings, SuccessStrings
 from .utils import Utils
 
