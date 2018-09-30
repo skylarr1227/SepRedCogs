@@ -1,0 +1,10 @@
+{
+    "author" : ["sep#0001"],
+    "install_msg" : "Thanks for installing Sep's TwitchLive! Load the cog, then use the 'twitchlive' command to get started!",
+    "name" : "TwitchLive",
+    "short" : "Announces to a role in a channel when someone's channel goes live.",
+    "description" : "Allows you to set up roles to tag/announce in a specified channel when someone's Twitch stream goes live.",
+    "tags" : ["utility"],
+    "requirements" : ["pytz"],
+    "hidden" : false
+}
