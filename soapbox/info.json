@@ -1,0 +1,13 @@
+{
+    "author" : ["sep#0001"],
+    "install_msg" : "**WARNING:** Activating Soapbox will ***delete*** all empty voice channels which end in `| ⏲️` !!",
+    "name" : "Soapbox",
+    "short" : "Allows users to generate temporary voice channels by entering a specified voice channel.",
+    "description" : "Allows users to generate temporary voice channels by entering a specified voice channel.",
+    "tags" : ["voice", "channels"],
+    "required_cogs": {
+        "seplib": "https://github.com/Seputaes/SepRedCogs.git"
+    },
+    "requirements" : [],
+    "hidden" : false
+}
