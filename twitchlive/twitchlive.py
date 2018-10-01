@@ -73,7 +73,14 @@ class TwitchLive(BaseSepCog):
 
     async def __add_already_announced(self, guild: discord.Guild, stream_id: str):
         self.already_announced_cache.add(stream_id)
-        await self.config.guild(guild).already_announced.set(list(self.already_announced_cache))
+
+        # get the DB value
+        current = await self.config.guild(guild).already_announced()
+        if current is None:
+            current = []
+        current = list(current)
+        current.append(stream_id)
+        await self.config.guild(guild).already_announced.set(current)
 
     async def __get_guild_announcements(self, guild: discord.Guild):
         return await self.config.guild(guild).announcements()
