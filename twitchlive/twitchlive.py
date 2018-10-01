@@ -1,5 +1,4 @@
 import asyncio
-import hashlib
 from collections import defaultdict
 from copy import deepcopy
 from typing import Optional, Tuple, Dict, Any, List
@@ -10,6 +9,7 @@ from redbot.core.bot import Red
 from redbot.core.commands import Context
 
 from cog_shared.seplib.classes.basesepcog import BaseSepCog
+from cog_shared.seplib.responses.embeds import ErrorReply, SuccessReply
 from twitchlive.models.common_models import StreamAnnouncement
 from twitchlive.twitchapi.twichobjects import TwitchUser
 from .twitchapi import TwitchApi
@@ -176,10 +176,16 @@ class TwitchLive(BaseSepCog):
                 announcement = StreamAnnouncement(bot=self.bot, **data)
 
                 if not announcement.is_valid:
+                    self.logger.error("Announcement is not valid. g:{}|c:{}|s:{}".format(
+                        announcement.guild.id, announcement.channel.id, announcement.twitch_name
+                    ))
                     print("Stream announcement is not valid. Moving on...")
                     continue
 
                 await self.__add_already_announced(guild=announcement.guild, stream_id=announcement.stream_id)
+                self.logger.info("Announcing streamer {}. Guild: {} | Channel: {}".format(
+                    announcement.twitch_name, announcement.guild.id, announcement.channel.id
+                ))
                 await announcement.channel.send(content=announcement.message_content, embed=announcement.embed)
 
             await asyncio.sleep(self.MONITOR_PROCESS_INTERVAL)
@@ -227,8 +233,10 @@ class TwitchLive(BaseSepCog):
 
         if ctx.guild is not None and not isinstance(ctx.channel, discord.DMChannel):
             # we're not in a guild. Delete the command message if we can.
+            self.logger.warn("Attempted to put client/secret in a chat channel! Deleting! g:{}|c:{}"
+                             .format(ctx.guild.id, ctx.channel.id))
             await ctx.channel.delete_messages([ctx.message])
-            return await ctx.send("For security purposes, this command must be run via whisper/DM to me.")
+            return await ErrorReply("For security purposes, this command must be run via whisper/DM to me.").send(ctx)
 
         new_config = {
             'client_id': client_id,
@@ -249,9 +257,11 @@ class TwitchLive(BaseSepCog):
         if not success:
             self.twitch_config_cache = current_cache
             await self.config.twitch_config.set(current_db_config)
-            return await ctx.send("{}. No changes made.".format(exception))
+            self.logger.info(exception)
+            return await ErrorReply("{}. No changes made.".format(exception)).send(ctx)
 
-        await ctx.send("Successfully updated the Twitch API configuration")
+        self.logger.info("Twitch API configured for Cog. Client ID: {}".format(client_id))
+        await ctx.tick()
 
 
     @_twitchlive.command(name="add")
@@ -259,19 +269,22 @@ class TwitchLive(BaseSepCog):
     @checks.is_owner()
     async def _add(self, ctx: Context, twitch_user: str, role: discord.Role, channel: discord.TextChannel):
         if not self.__twitch_is_init():
-            await ctx.send("Twitch API is not initialized. Please run the `configure` sub-command.")
+            self.logger.info("Attempted to execute 'add' command without Twitch API configured.")
+            return await ErrorReply("Twitch API is not initialized. Please run the `configure` sub-command.").send(ctx)
 
         success, response_msg = await self.__check_announce_permissions(channel=channel, role=role)
 
         if not success:
-            await ctx.send(response_msg)
+            self.logger.info(f"Bot does not have the proper permissions to announce. c:{channel.id}|{role.id}. Error:"
+                             f"{response_msg}")
+            return await ErrorReply(response_msg).send(ctx)
 
         twitch_user = twitch_user.lower()
 
         users = await self.twitch_api.get_users_by_login(username=twitch_user)
 
         if not users:
-            return await ctx.send("That twitch user was not found")
+            return await ErrorReply("That Twitch user was not found").send(ctx)
 
         user = users[0]
 
@@ -282,18 +295,22 @@ class TwitchLive(BaseSepCog):
         if curr_for_user:
             role_id = curr_for_user.get('role_id')
             channel_id = curr_for_user.get('channel_id')
-            return await ctx.send(f"An annoucement for that Twitch User already exists on this server. "
-                                  f"Role: `{role_id}` Channel: `{channel_id}`")
+            self.logger.info(f"Announcement already exists for streamer. "
+                             f"s:{user.display_name}|c:{channel.id}|r:{role.id}")
+            message = f"An annoucement for that Twitch User already exists on this server. " \
+                      f"Role: `{role_id}` Channel: `{channel_id}`"
+            return await ErrorReply(message).send(ctx)
 
         await self.__add_current_announcement(guild=ctx.guild, role=role, channel=channel, user=user)
-        await ctx.send("Added announcement")
+        await ctx.tick()
 
     @_twitchlive.command(name="remove")
     @commands.guild_only()
     @checks.is_owner()
     async def _remove(self, ctx: Context, twitch_user: str):
         if not self.__twitch_is_init():
-            await ctx.send("Twitch API is not initialized. Please run the `configure` sub-command.")
+            self.logger.info("Attempted to execute 'remove' command without Twitch API configured.")
+            return await ErrorReply("Twitch API is not initialized. Please run the `configure` sub-command.").send(ctx)
 
         twitch_user = twitch_user.lower()
 
@@ -301,13 +318,13 @@ class TwitchLive(BaseSepCog):
         user_id = user_ids.get(twitch_user)
 
         if not user_id:
-            return await ctx.send("That twitch user was not found")
+            return await ErrorReply("That Twitch user was not found").send(ctx)
 
         curr_for_user = await self.__get_current_announcement(ctx.guild, user_id)
         if not curr_for_user:
-            return await ctx.send("An announcement does not exist for that user.")
+            return await ErrorReply("An announcement does not exist for that Twitch user.").send(ctx)
 
         role_id = curr_for_user.get('role_id')
         role = self.__get_role_by_id(ctx.guild, int(role_id))
         await self.__remove_current_announcement(guild=ctx.guild, user_id=user_id)
-        await ctx.send(f"Removed Announcement. It was assigned to Role: `{role.name}`")
+        await SuccessReply(f"Removed Announcement. It was assigned to Role: `{role.name}`").send(ctx)
