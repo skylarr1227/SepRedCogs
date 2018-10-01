@@ -50,11 +50,10 @@ class TwitchLive(BaseSepCog):
             announcements = guild_dict.get('announcements', {})
             already_announced = guild_dict.get('already_announced', [])
 
-
             for user_id, metadata in announcements.items():
                 streamer_checks[str(guild_id)][str(user_id)] = metadata
 
-            self.already_announced_cache | set(already_announced)
+            self.already_announced_cache.update(set(already_announced))
 
         self.announce_cache = streamer_checks
 
@@ -73,14 +72,7 @@ class TwitchLive(BaseSepCog):
 
     async def __add_already_announced(self, guild: discord.Guild, stream_id: str):
         self.already_announced_cache.add(stream_id)
-
-        # get the DB value
-        current = await self.config.guild(guild).already_announced()
-        if current is None:
-            current = []
-        current = list(current)
-        current.append(stream_id)
-        await self.config.guild(guild).already_announced.set(current)
+        await self.config.guild(guild).already_announced.set(list(self.already_announced_cache))
 
     async def __get_guild_announcements(self, guild: discord.Guild):
         return await self.config.guild(guild).announcements()
@@ -186,7 +178,6 @@ class TwitchLive(BaseSepCog):
                     self.logger.error("Announcement is not valid. g:{}|c:{}|s:{}".format(
                         announcement.guild.id, announcement.channel.id, announcement.twitch_name
                     ))
-                    print("Stream announcement is not valid. Moving on...")
                     continue
 
                 await self.__add_already_announced(guild=announcement.guild, stream_id=announcement.stream_id)
