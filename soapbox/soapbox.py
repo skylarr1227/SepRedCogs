@@ -13,9 +13,6 @@ from cog_shared.seplib.responses.embeds import ErrorReply, InfoReply
 class Soapbox(BaseSepCog):
     SOAPBOX_CHANNEL_SUFFIX = "| \N{TIMER CLOCK}"
 
-    TEMP_VOICE_CATEGORY_ID = str(489969702320340992)
-    TEMP_MAX_USER_CHANNELS = 2
-
     def __init__(self, bot: Red):
 
         super(Soapbox, self).__init__(bot=bot)
