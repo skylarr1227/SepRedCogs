@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Union, Tuple
 
 import discord
 from redbot.core import Config, commands, checks
@@ -7,11 +7,12 @@ from redbot.core.commands import Context
 
 from cog_shared.seplib.classes.basesepcog import BaseSepCog
 from cog_shared.seplib.constants.colors import HexColors
-from cog_shared.seplib.responses.embeds import ErrorReply, InfoReply
+from cog_shared.seplib.responses.embeds import ErrorReply, InfoReply, SuccessReply
 
 
 class Soapbox(BaseSepCog):
-    SOAPBOX_CHANNEL_SUFFIX = "| \N{TIMER CLOCK}"
+    DEFAULT_SOAPBOX_SUFFIX = "| \N{TIMER CLOCK}"
+    DEFAULT_MAX_USER_SOAPBOXES = 2
 
     def __init__(self, bot: Red):
 
@@ -40,12 +41,15 @@ class Soapbox(BaseSepCog):
         self.guild_config_cache = guild_config
 
     async def _set_soapbox_config(self, guild: discord.Guild, trigger: discord.VoiceChannel,
-                                  category: discord.CategoryChannel, max_user_channels: int):
+                                  category: discord.CategoryChannel, max_user_channels: int,
+                                  suffix: str):
 
         guild_cache = {
             'trigger': str(trigger.id),
             'category': str(category.id),
-            'max_user_channels': max_user_channels
+            'usermax': max_user_channels,
+            'max_user_channels': int(max_user_channels),
+            'suffix': suffix
         }
 
         # update the cache
@@ -53,6 +57,30 @@ class Soapbox(BaseSepCog):
         # update the db
         await self.config.guild(guild).config.set(guild_cache)
         self.logger.info(f"Updated the configuration for Guild: {guild.id} | {guild_cache}")
+
+    async def _set_single_config(self, guild: discord.Guild, setting: str,
+                           value: Union[str, int, discord.CategoryChannel, discord.VoiceChannel]):
+
+        if isinstance(value, (discord.CategoryChannel, discord.VoiceChannel)):
+            value = str(value.id)
+
+        cache = self.guild_config_cache.get(str(guild.id), {})
+
+        cache[setting] = value
+
+        self.guild_config_cache[(str(guild.id))] = cache
+        await self.config.guild(guild).config.set(cache)
+        self.logger.info(f"Updated config for Guild: {guild.id} | k:{setting}|v:{value}")
+
+
+    def _validate_config_setting(self, setting: str,
+                                 value: Union[discord.CategoryChannel,
+                                              discord.VoiceChannel, str, int]) -> Tuple[bool, str]:
+
+        if setting.lower() == 'usermax' and value < 1:
+            return (False, "Max User Channels must be greater than 0")
+
+        return (True, "")
 
     def _bot_can_manage_category(self, category: discord.CategoryChannel) -> bool:
         return category.permissions_for(category.guild.me).manage_channels
@@ -75,8 +103,15 @@ class Soapbox(BaseSepCog):
     async def _is_trigger_channel(self, channel: discord.VoiceChannel) -> bool:
         return str(channel.id) == self._get_trigger_channel_id(channel.guild)
 
+    def _get_suffix(self, guild: discord.Guild):
+        suffix = self.guild_config_cache.get(str(guild.id), {}).get('suffix')
+        if suffix is None:
+            self.logger.warn(f"Suffix not found in the cahce for Guild {guild.id}. Returning default.")
+            return self.DEFAULT_SOAPBOX_SUFFIX
+        return suffix
+
     def _is_soapbox_channel(self, channel: discord.VoiceChannel) -> bool:
-        return channel.name.endswith(self.SOAPBOX_CHANNEL_SUFFIX)
+        return channel.name.endswith(self._get_suffix(guild=channel.guild))
 
     def _channel_is_empty(self, channel: discord.VoiceChannel) -> bool:
         voice_channel = channel.guild.get_channel(channel_id=channel.id)
@@ -116,17 +151,18 @@ class Soapbox(BaseSepCog):
         """
         await ctx.send_help()
 
-    @_soapbox.command(name="configure")
+    @_soapbox.command(name="setup")
     @commands.guild_only()
     @checks.mod_or_permissions(manage_channels=True)
-    async def _soapbox_configure(self, ctx: Context, trigger_channel: discord.VoiceChannel,
-                                 target_category: discord.CategoryChannel, max_user_channels: int):
+    async def _soapbox_setup(self, ctx: Context, trigger_channel: discord.VoiceChannel,
+                             target_category: discord.CategoryChannel):
         """
-        Configures Soapbox with the trigger Voice channel, target category for the new voice Channel, and the maxinum number of temporary channels a user can have.
+        Configures Soapbox with the trigger voice channel and target category for the new Soapbox channel.
+
+        This will use the default suffix and Max User Channels. To change these (and any other) config in the future, use the "soapbox set" command.
 
         :trigger_channel: Name of the voice channel which will trigger a new voice channel to be created on join. Use quotes if the channel name has spaces.
         :target_category: Category where the new voice channel will be created. The new channel will have the same permissions as the category. Use quotes if the category name has spaces.
-        :max_user_channels: Soapbox channels are named after the member that created them. They can have max this number of Soapbox channels created.
         """
 
         # check that we can manage channels for the category
@@ -138,9 +174,62 @@ class Soapbox(BaseSepCog):
                                     "out of the trigger channel").send(ctx)
 
         await self._set_soapbox_config(guild=ctx.guild, trigger=trigger_channel, category=target_category,
-                                       max_user_channels=max_user_channels)
-
+                                       max_user_channels=self.DEFAULT_MAX_USER_SOAPBOXES,
+                                       suffix=self.DEFAULT_SOAPBOX_SUFFIX)
         await ctx.tick()
+
+    @_soapbox.group(name="set")
+    @commands.guild_only()
+    @checks.mod_or_permissions(manage_channels=True)
+    async def _soapbox_set(self, ctx: Context):
+        """
+        Sets one of soapbox's configuration options for this server.
+        """
+        await ctx.send_help()
+
+    @_soapbox_set.command(name="trigger")
+    @commands.guild_only()
+    @checks.mod_or_permissions(manage_channels=True)
+    async def _soapbox_set_trigger(self, ctx: Context, *, voice_channel: discord.VoiceChannel):
+        valid, response = self._validate_config_setting(ctx.command.name, voice_channel)
+        if not valid:
+            return await ErrorReply(response).send(ctx)
+
+        await self._set_single_config(guild=ctx.guild, setting=ctx.command.name, value=voice_channel)
+        await SuccessReply(f"Set the Soapbox trigger voice channel to `{voice_channel.name}`").send(ctx)
+
+    @_soapbox_set.command(name="category")
+    @commands.guild_only()
+    @checks.mod_or_permissions(manage_channels=True)
+    async def _soapbox_set_category(self, ctx: Context, * , category: discord.CategoryChannel):
+        valid, response = self._validate_config_setting(ctx.command.name, category)
+        if not valid:
+            return await ErrorReply(response).send(ctx)
+
+        await self._set_single_config(guild=ctx.guild, setting=ctx.command.name, value=category)
+        await SuccessReply(f"Set the Soapbox category to `{category.name}").send(ctx)
+
+    @_soapbox_set.command(name="usermax")
+    @commands.guild_only()
+    @checks.mod_or_permissions(manage_channels=True)
+    async def _soapbox_set_usermax(self, ctx: Context, user_max_channels: int):
+        valid, response = self._validate_config_setting(ctx.command.name, user_max_channels)
+        if not valid:
+            return await ErrorReply(response).send(ctx)
+        await self._set_single_config(guild=ctx.guild, setting=ctx.command.name, value=user_max_channels)
+        await ctx.tick()
+
+    @_soapbox_set.command(name="suffix")
+    @commands.guild_only()
+    @checks.mod_or_permissions(manage_channels=True)
+    async def _soapbox_set_suffix(self, ctx: Context, *, suffix: str):
+        valid, response = self._validate_config_setting(ctx.command.name, suffix)
+        if not valid:
+            return await ErrorReply(response).send(ctx)
+
+        await self._set_single_config(guild=ctx.guild, setting=ctx.command.name, value=suffix)
+        await SuccessReply(f"Set the Soapbox channel suffix to `{suffix}`. **NOTE:** You will need to manually "
+                           f"cleanup old Soapbox channels.").send(ctx)
 
     @_soapbox.command(name="suffix")
     @commands.guild_only()
@@ -150,7 +239,7 @@ class Soapbox(BaseSepCog):
         Displays the current Soapbox suffix which is appended to new temporary voice channels.
         """
         return await InfoReply("The current Soapbox suffix is set to: `{}`"
-                               .format(self.SOAPBOX_CHANNEL_SUFFIX)).send(ctx)
+                               .format(self._get_suffix(ctx.guild))).send(ctx)
 
     @_soapbox.command(name="cleanup")
     @commands.guild_only()
@@ -161,7 +250,7 @@ class Soapbox(BaseSepCog):
         """
         channels = ctx.guild.voice_channels  # type: List[discord.VoiceChannel]
 
-        soapbox_channels = [sb for sb in channels if sb.name.endswith(self.SOAPBOX_CHANNEL_SUFFIX)]
+        soapbox_channels = [sb for sb in channels if sb.name.endswith(self._get_suffix(ctx.guild))]
 
         deleted_channels = []
         error_channels = []
@@ -210,7 +299,7 @@ class Soapbox(BaseSepCog):
             if await self._is_trigger_channel(after_channel):
                 for i in range(1, self._get_max_user_channels(after_channel.guild) + 1):
                     new_channel_name = "{member} {discr} {suffix}".format(member=member.display_name, discr=i,
-                                                                        suffix=self.SOAPBOX_CHANNEL_SUFFIX)
+                                                                          suffix=self._get_suffix(after_channel.guild))
 
                     # see if it exists
                     check_channel = discord.utils.get(member.guild.voice_channels, name=new_channel_name)

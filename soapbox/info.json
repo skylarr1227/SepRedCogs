@@ -1,6 +1,6 @@
 {
     "author" : ["sep#0001"],
-    "install_msg" : "**WARNING:** Activating Soapbox will ***delete*** all empty voice channels which end in `| ⏲️` !!",
+    "install_msg" : "**WARNING:** Configuring Soapbox will ***delete*** all empty voice channels which end in the specified suffix. Choose it carefully.",
     "name" : "Soapbox",
     "short" : "Allows users to generate temporary voice channels by entering a specified voice channel.",
     "description" : "Allows users to generate temporary voice channels by entering a specified voice channel.",
