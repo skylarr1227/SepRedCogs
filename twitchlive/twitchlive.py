@@ -3,6 +3,7 @@ from collections import defaultdict
 from copy import deepcopy
 from typing import Optional, Tuple, Dict, Any, List
 
+import aiohttp
 import discord
 from redbot.core import Config, commands, checks
 from redbot.core.bot import Red
@@ -150,7 +151,13 @@ class TwitchLive(BaseSepCog):
                 batch_user_ids = list(work_list.keys())[i:i+batch_size]
 
                 # get streams for these user_ids
-                streams = await self.twitch_api.get_streams_for_multiple(batch_user_ids)
+                try:
+                    streams = await self.twitch_api.get_streams_for_multiple(batch_user_ids)
+                except aiohttp.client_exceptions.ClientError as e:
+                    print(e.__traceback__)
+                    self.logger.error("Error connecting to the Twitch API.")
+                    self.logger.error(e, exc_info=True)
+                    continue
 
                 for stream in streams:
                     should_announce = stream.is_live and \
