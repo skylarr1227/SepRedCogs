@@ -154,7 +154,6 @@ class TwitchLive(BaseSepCog):
                 try:
                     streams = await self.twitch_api.get_streams_for_multiple(batch_user_ids)
                 except aiohttp.client_exceptions.ClientError as e:
-                    print(e.__traceback__)
                     self.logger.error("Error connecting to the Twitch API.")
                     self.logger.error(e, exc_info=True)
                     continue
