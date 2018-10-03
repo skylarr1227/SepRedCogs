@@ -91,19 +91,24 @@ class Soapbox(BaseSepCog):
     def _bot_can_move_members(self, channel: discord.VoiceChannel) -> bool:
         return channel.permissions_for(channel.guild.me).move_members
 
-    def _get_trigger_channel_id(self, guild: discord.Guild):
+    def _get_trigger_channel_id(self, guild: discord.Guild) -> str:
         return self.guild_config_cache.get(str(guild.id), {}).get('trigger')
 
-    def _get_new_category_id(self, guild: discord.Guild):
+    def _get_new_category_id(self, guild: discord.Guild) -> str:
         return self.guild_config_cache.get(str(guild.id), {}).get('category')
 
-    def _get_max_user_channels(self, guild: discord.guild):
-        return self.guild_config_cache.get(str(guild.id), {}).get('max_user_channels')
+    def _get_max_user_channels(self, guild: discord.guild) -> int:
+        value = self.guild_config_cache.get(str(guild.id), {}).get('max_user_channels')
+        if value is None:
+            self.logger.warn(f"Suffix not found in the cahce for Guild {guild.id}. Returning default.")
+            return self.DEFAULT_MAX_USER_SOAPBOXES
+        return value
+
 
     async def _is_trigger_channel(self, channel: discord.VoiceChannel) -> bool:
         return str(channel.id) == self._get_trigger_channel_id(channel.guild)
 
-    def _get_suffix(self, guild: discord.Guild):
+    def _get_suffix(self, guild: discord.Guild) -> str:
         suffix = self.guild_config_cache.get(str(guild.id), {}).get('suffix')
         if suffix is None:
             self.logger.warn(f"Suffix not found in the cahce for Guild {guild.id}. Returning default.")
@@ -304,6 +309,11 @@ class Soapbox(BaseSepCog):
                     # see if it exists
                     check_channel = discord.utils.get(member.guild.voice_channels, name=new_channel_name)
                     if check_channel is None:
+                        # category validation
+                        category = self._get_new_category_id(after_channel.guild)
+                        if category is None:
+                            self.logger.error(f"Soapbox category has not been configured for guild {after_channel.guild.id}")
+                            return  # do nothing
                         # create the channel and move the user into it
                         return await self._create_channel_and_move(
                             category_id=self._get_new_category_id(after_channel.guild),
