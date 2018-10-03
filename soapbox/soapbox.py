@@ -109,11 +109,11 @@ class Soapbox(BaseSepCog):
         return str(channel.id) == self._get_trigger_channel_id(channel.guild)
 
     def _get_suffix(self, guild: discord.Guild) -> str:
-        suffix = self.guild_config_cache.get(str(guild.id), {}).get('suffix')
+        suffix = self.guild_config_cache.get(str(guild.id), {}).get('suffix')  # type: str
         if suffix is None:
             self.logger.warn(f"Suffix not found in the cahce for Guild {guild.id}. Returning default.")
             return self.DEFAULT_SOAPBOX_SUFFIX
-        return suffix
+        return suffix.rstrip()
 
     def _is_soapbox_channel(self, channel: discord.VoiceChannel) -> bool:
         return channel.name.endswith(self._get_suffix(guild=channel.guild))
@@ -232,7 +232,7 @@ class Soapbox(BaseSepCog):
         if not valid:
             return await ErrorReply(response).send(ctx)
 
-        await self._set_single_config(guild=ctx.guild, setting=ctx.command.name, value=suffix)
+        await self._set_single_config(guild=ctx.guild, setting=ctx.command.name, value=suffix.rstrip())
         await SuccessReply(f"Set the Soapbox channel suffix to `{suffix}`. **NOTE:** You will need to manually "
                            f"cleanup old Soapbox channels.").send(ctx)
 
