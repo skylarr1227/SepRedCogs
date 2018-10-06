@@ -6,6 +6,6 @@
     "short" : "Library with helper and utility classes for use in other cogs.",
     "description" : "Library with helper and utility classes for use in other cogs.",
     "tags" : ["library", "utility"],
-    "requirements" : [],
+    "requirements" : ["boto3"],
     "hidden" : false
 }
