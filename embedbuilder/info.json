@@ -1,0 +1,13 @@
+{
+    "author" : ["sep#0001"],
+    "install_msg" : "Thanks for installing Embed Builder.",
+    "name" : "Soapbox",
+    "short" : "A set of commands for building and posting embeds by the bot.",
+    "description" : "A set of commands for building and posting embeds by the bot.",
+    "tags" : ["utility", "text"],
+    "required_cogs": {
+        "seplib": "https://github.com/Seputaes/SepRedCogs.git"
+    },
+    "requirements" : [],
+    "hidden" : false
+}
