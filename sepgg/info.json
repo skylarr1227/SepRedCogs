@@ -5,6 +5,6 @@
     "short" : "Collection of commands for sep.gg",
     "description" : "Collection of commands for sep.gg",
     "tags" : ["utility"],
-    "requirements" : [],
+    "requirements" : ["boto3"],
     "hidden" : false
 }
