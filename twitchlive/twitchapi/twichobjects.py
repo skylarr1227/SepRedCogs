@@ -40,7 +40,8 @@ class TwitchAuthToken(object):
 
 class TwitchStream(object):
     def __init__(self, community_ids: List[str], game_id: str, id: str, language: str, started_at: str,
-                 thumbnail_url: str, title: str, type: str, user_id: str, viewer_count: int, pagination=None):
+                 thumbnail_url: str, title: str, type: str, user_id: str, viewer_count: int, pagination=None,
+                 user_name: str = None, **kwargs):
 
         self.community_ids = community_ids
         self.game_id = game_id
@@ -53,6 +54,7 @@ class TwitchStream(object):
         self.type = type
         self.user_id = user_id
         self.viewer_count = viewer_count
+        self.user_name = user_name
 
     def __create_started_dt(self, started_at: str):
         return datetime.datetime.strptime(started_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=pytz.UTC)
