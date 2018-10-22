@@ -52,7 +52,7 @@ class TwitchLive(BaseSepCog):
             already_announced = guild_dict.get('already_announced', [])
 
             for user_id, metadata in announcements.items():
-                streamer_checks[str(guild_id)][str(user_id)] = metadata
+                streamer_checks[int(guild_id)][str(user_id)] = metadata
 
             self.already_announced_cache.update(set(already_announced))
 
