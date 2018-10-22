@@ -16,7 +16,7 @@ from .strings import ErrorStrings, MiscStrings, DateTimeStrings, SuccessStrings
 from .utils import Utils
 
 
-class SimpleReactRoles(BaseSepCog):
+class SimpleReactRoles(BaseSepCog, commands.Cog):
 
     EMOJI_REGEX = re.compile("<a?:[a-zA-Z0-9_]{2,32}:(\d{1,20})>")
     ADD_REMOVE_INTERVAL = 0.2

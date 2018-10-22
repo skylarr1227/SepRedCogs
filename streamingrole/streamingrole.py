@@ -9,7 +9,7 @@ from redbot.core.commands import Context
 from cog_shared.seplib.classes.basesepcog import BaseSepCog
 
 
-class StreamingRole(BaseSepCog):
+class StreamingRole(BaseSepCog, commands.Cog):
     ADD_REMOVE_INTERVAL = 0.2
 
     def __init__(self, bot: Red):

@@ -10,7 +10,7 @@ from cog_shared.seplib.constants.colors import HexColors
 from cog_shared.seplib.responses.embeds import ErrorReply, InfoReply, SuccessReply
 
 
-class Soapbox(BaseSepCog):
+class Soapbox(BaseSepCog, commands.Cog):
     DEFAULT_SOAPBOX_SUFFIX = "| \N{TIMER CLOCK}"
     DEFAULT_MAX_USER_SOAPBOXES = 2
 

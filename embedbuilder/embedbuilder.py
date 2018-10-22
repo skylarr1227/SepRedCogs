@@ -6,7 +6,7 @@ from redbot.core.commands import Context
 from cog_shared.seplib.classes.basesepcog import BaseSepCog
 
 
-class EmbedBuilder(BaseSepCog):
+class EmbedBuilder(BaseSepCog, commands.Cog):
 
     def __init__(self, bot: Red):
         super(EmbedBuilder, self).__init__(bot=bot)

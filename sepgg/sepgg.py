@@ -13,7 +13,7 @@ from cog_shared.seplib.classes.basesepcog import BaseSepCog
 from cog_shared.seplib.responses.embeds import ErrorReply
 
 
-class SepGG(BaseSepCog):
+class SepGG(BaseSepCog, commands.Cog):
 
     SHORTLINK_PATH_REGEX = re.compile("^[A-Za-z\d][A-Za-z\d_]*$")
 

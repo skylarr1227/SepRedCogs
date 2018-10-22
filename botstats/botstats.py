@@ -17,7 +17,7 @@ from redbot.core.commands import Context
 from .stat_helpers import StatHelpers
 
 
-class BotStats(object):
+class BotStats(commands.Cog):
 
     EMOJI_REGEX = re.compile("<a?:[a-zA-Z0-9_]{2,32}:(\d{1,20})>")
     CPU_MONITOR_INTERVAL = 0.2
@@ -25,6 +25,7 @@ class BotStats(object):
     COG_CONFIG_SALT = "twitch.tv/seputaes"
 
     def __init__(self, bot: Red):
+        super(BotStats, self).__init__()
         self.bot = bot
         self.config = self.__setup_config()
 

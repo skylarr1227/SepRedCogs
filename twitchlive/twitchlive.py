@@ -15,7 +15,7 @@ from twitchlive.models.common_models import StreamAnnouncement
 from twitchlive.twitchapi.twichobjects import TwitchUser
 from .twitchapi import TwitchApi
 
-class TwitchLive(BaseSepCog):
+class TwitchLive(BaseSepCog, commands.Cog):
 
     MONITOR_PROCESS_INTERVAL = 5
     TWITCH_API_THROTTLE = 0.2
