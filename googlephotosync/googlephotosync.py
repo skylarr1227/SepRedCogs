@@ -204,8 +204,8 @@ class GooglePhotoSync(BaseSepCog, commands.Cog):
     async def on_message(self, message: discord.Message):
         album_name = self._get_album_name(message.channel)
         photo_url = self._get_message_photo_url(message)
-        file_name = os.path.basename(photo_url)
         if album_name is not None and photo_url is not None:
+            file_name = os.path.basename(photo_url)
             # get the image via HTTP
             try:
                 photo_data = await self._get_message_image(photo_url)
