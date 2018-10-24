@@ -1,0 +1,13 @@
+{
+    "author" : ["sep#0001"],
+    "install_msg" : "Welcome to Sep's GooglePhotoSync!",
+    "name" : "GooglePhotoSync",
+    "short" : "Syncs all photos posted to a specified Discord channel to a Google Photos album.",
+    "description" : "Syncs all photos posted to a specified Discord channel to a Google Photos album.",
+    "tags" : ["utility", "photos"],
+    "required_cogs": {
+        "seplib": "https://github.com/Seputaes/SepRedCogs.git"
+    },
+    "requirements" : ["google-api-python-client", "oauth2client", "google-auth-oauthlib"],
+    "hidden" : false
+}
