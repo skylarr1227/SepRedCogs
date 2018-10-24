@@ -220,10 +220,12 @@ class GooglePhotoSync(BaseSepCog, commands.Cog):
             await message.add_reaction("✅")
 
     @commands.group(name="photosync", invoke_without_command=True)
+    @commands.is_owner()
     async def _photosync(self, ctx: Context):
         await ctx.send_help()
 
     @_photosync.command(name="map")
+    @commands.is_owner()
     async def _photosync_map(self, ctx: Context, channel: discord.TextChannel, album_id: str):
 
         has_permissions, response = await self._check_channel_permissions(channel)
