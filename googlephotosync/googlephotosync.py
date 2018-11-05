@@ -185,14 +185,16 @@ class GooglePhotoSync(BaseSepCog, commands.Cog):
         return self.watching_channel_cache.get(guild_id, {}).get(channel_id)
 
     @staticmethod
-    def _get_message_photo_url(message: discord.Message) -> Optional[str]:
+    def _get_message_photo_urls(message: discord.Message) -> Optional[List[str]]:
         attachments = message.attachments  # type: List[discord.Attachment]
+
+        photo_urls = set()
 
         for attachment in attachments:
             # width and height will be defined if it's an image
             if attachment.height is not None and attachment.width is not None:
-                return attachment.url
-        return None
+                photo_urls.add(attachment.url)
+        return list(photo_urls)
 
     async def _get_message_image(self, url: str):
 
@@ -203,21 +205,21 @@ class GooglePhotoSync(BaseSepCog, commands.Cog):
 
     async def on_message(self, message: discord.Message):
         album_name = self._get_album_name(message.channel)
-        photo_url = self._get_message_photo_url(message)
-        if album_name is not None and photo_url is not None:
-            file_name = os.path.basename(photo_url)
-            # get the image via HTTP
+        photo_urls = self._get_message_photo_urls(message)
+        if album_name is not None and photo_urls:
             try:
-                photo_data = await self._get_message_image(photo_url)
-                upload_session = await self._get_upload_session()
-                await self._add_photo_to_album(file_name=file_name,
-                                               photo_bytes=photo_data, album_name=album_name,
-                                               session=upload_session)
+                for url in photo_urls:
+                    file_name = os.path.basename(url)
+                    # get the image via HTTP
+                    photo_data = await self._get_message_image(url)
+                    upload_session = await self._get_upload_session()
+                    await self._add_photo_to_album(file_name=file_name,
+                                                   photo_bytes=photo_data, album_name=album_name,
+                                                   session=upload_session)
+                await message.add_reaction("✅")
             except (HttpError, Exception) as e:
                 self.logger.error(f"Error retrieving image from Discord Server. URL: {photo_url} | Error: {e}")
-                return
-
-            await message.add_reaction("✅")
+                return await message.add_reaction("❌")
 
     @commands.group(name="photosync", invoke_without_command=True)
     @commands.is_owner()
@@ -234,3 +236,4 @@ class GooglePhotoSync(BaseSepCog, commands.Cog):
             return await ErrorReply(response).send(ctx)
 
         await self._map_channel_to_album(channel, album_id)
+        await ctx.tick()
