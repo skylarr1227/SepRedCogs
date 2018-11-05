@@ -204,6 +204,8 @@ class GooglePhotoSync(BaseSepCog, commands.Cog):
                     return await resp.read()
 
     async def on_message(self, message: discord.Message):
+        if not isinstance(message.channel, discord.TextChannel):
+            return None
         album_name = self._get_album_name(message.channel)
         photo_urls = self._get_message_photo_urls(message)
         if album_name is not None and photo_urls:
