@@ -86,10 +86,13 @@ class TwitchApi(object):
 
                 users = []
 
-                for stream in json_response.get('data'):
-                    users.append(TwitchUser(**stream))
-                return users
+                user_data = json_response.get('data', {})
+                if not user_data:
+                    print(f"Invalid twitch response for Users. Full response: {json_response}")
 
+                for user in user_data:
+                    users.append(TwitchUser(**user))
+                return users
 
     async def get_streams_for_multiple(self, user_id_list: List[str]) -> List[TwitchStream]:
         username_str = "&user_id=".join(user_id_list) # really, twitch?
@@ -104,7 +107,11 @@ class TwitchApi(object):
 
                 streams = []
 
-                for stream in json_response.get('data'):
+                stream_data = json_response.get('data', {})
+                if not stream_data:
+                    print(f"Invalid twitch response for Streams. Full response: {json_response}")
+
+                for stream in stream_data:
                     streams.append(TwitchStream(**stream))
                 return streams
 
