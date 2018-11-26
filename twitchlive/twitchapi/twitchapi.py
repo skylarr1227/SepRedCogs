@@ -87,7 +87,7 @@ class TwitchApi(object):
                 users = []
 
                 user_data = json_response.get('data', {})
-                if not user_data:
+                if isinstance(user_data, dict) and not user_data:
                     print(f"Invalid twitch response for Users. Full response: {json_response}")
 
                 for user in user_data:
@@ -108,7 +108,7 @@ class TwitchApi(object):
                 streams = []
 
                 stream_data = json_response.get('data', {})
-                if not stream_data:
+                if isinstance(stream_data, dict) and not stream_data:
                     print(f"Invalid twitch response for Streams. Full response: {json_response}")
 
                 for stream in stream_data:
