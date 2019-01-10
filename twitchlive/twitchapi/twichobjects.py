@@ -49,7 +49,7 @@ class TwitchStream(object):
         self.language = language
         self.pagination = pagination
         self.started_at = self.__create_started_dt(started_at)
-        self.thumbnail_url = thumbnail_url
+        self.thumbnail_url = "{}?cache={}".format(thumbnail_url, datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S"))
         self.title = title
         self.type = type
         self.user_id = user_id
