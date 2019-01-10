@@ -63,4 +63,5 @@ class StreamAnnouncement(object):
 
     @property
     def message_content(self):
-        return f"{self.role.mention} {self.twitch_name} is now live! {self.stream_url}"
+        name = self.twitch_name.replace("_", "\\_")
+        return f"{self.role.mention} {name} is now live! {self.stream_url}"
