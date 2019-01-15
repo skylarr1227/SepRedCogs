@@ -14,7 +14,7 @@ class EmbedReply(object):
 
     def build_message(self):
         return_msg = "{}" + self.message
-        prefix = f"{self.emoji}" if self.emoji is not None else ""
+        prefix = f"{self.emoji} " if self.emoji is not None else ""
         return return_msg.format(prefix)
 
     def build(self) -> discord.Embed:

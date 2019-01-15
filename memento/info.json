@@ -1,0 +1,13 @@
+{
+    "author" : ["sep#0001"],
+    "install_msg" : "Thanks for installing Memento. Never forget again.",
+    "name" : "Memento",
+    "short" : "Allows users to set reminders and have the bot DM them when the time comes.",
+    "description" : "Allows users to set reminders and have the bot DM them when the time comes.",
+    "tags" : ["voice", "channels"],
+    "required_cogs": {
+        "seplib": "https://github.com/Seputaes/SepRedCogs.git"
+    },
+    "requirements" : ["recurrent"],
+    "hidden" : false
+}
