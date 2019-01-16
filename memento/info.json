@@ -8,6 +8,6 @@
     "required_cogs": {
         "seplib": "https://github.com/Seputaes/SepRedCogs.git"
     },
-    "requirements" : ["recurrent"],
+    "requirements" : ["recurrent", "pytz"],
     "hidden" : false
 }
