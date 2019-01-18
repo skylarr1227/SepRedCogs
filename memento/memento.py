@@ -6,15 +6,14 @@ from typing import Optional, Tuple, List, Dict
 import discord
 import pytz
 import recurrent
-from cog_shared.seplib.constants.colors import HexColors
-from cog_shared.seplib.responses.embeds import ErrorReply, SuccessReply, EmbedReply
+from cog_shared.seplib.classes.basesepcog import BaseSepCog
+from cog_shared.seplib.responses.embeds import ErrorReply
 from cog_shared.seplib.utils.random_utils import random_string
 from memento.alarmreply import AlarmReply
+from memento.reminder import Reminder
 from memento.timezonestrings import TimezoneStrings
 from pytz.tzinfo import DstTzInfo
 from redbot.core import commands, Config
-
-from cog_shared.seplib.classes.basesepcog import BaseSepCog
 from redbot.core.bot import Red
 from redbot.core.commands import Context
 
@@ -31,7 +30,7 @@ class Memento(BaseSepCog, commands.Cog):
 
         super(Memento, self).__init__(bot=bot)
         self.user_config_cache = {}
-        self.user_reminder_cache = {}
+        self.user_reminder_cache = {}  # type: Dict[str, List[Reminder]]
 
         self._add_future(self.__monitor_reminders())
         self._ensure_futures()
@@ -54,11 +53,32 @@ class Memento(BaseSepCog, commands.Cog):
             if config is not None:
                 user_config[str(user_id)] = config
             if reminders is not None:
-                user_reminders[str(user_id)] = reminders
+                cache_reminders = []
+                for reminder in reminders:
+                    try:
+                        cache_reminders.append(Reminder(**reminder))
+                    except TypeError as e:
+                        self.logger.error("Error converting database reminders to Reminder class. Error: {}".format(e))
+                        continue
+                user_reminders[str(user_id)] = cache_reminders
 
         self.user_config_cache = user_config
         self.user_reminder_cache = user_reminders
 
+    """
+    Given a pytz DstTzInfo object, return the Recurrent library Recurring event parser object 
+    with the startime time localized to the user's timezone.
+    :param user_timezone: pytz Timezone Info object for the user's timezone.
+    """
+    @staticmethod
+    async def _get_recurrent_object(user_timezone: DstTzInfo) -> recurrent.RecurringEvent:
+        now = datetime.datetime.utcnow()
+        user_now = pytz.UTC.localize(now).astimezone(user_timezone).replace(tzinfo=None)
+        return recurrent.RecurringEvent(now_date=user_now)
+
+    """
+    Loop which iterates overall set reminders and checks if it's time to announce them to the user.
+    """
     async def __monitor_reminders(self):
         await self.bot.wait_until_ready()
 
@@ -67,7 +87,7 @@ class Memento(BaseSepCog, commands.Cog):
 
             for user_id, user_reminders in self.user_reminder_cache.items():
                 for user_reminder in user_reminders:
-                    dt_string = user_reminder.get('dt')
+                    dt_string = user_reminder.dt_str
                     if dt_string is None:
                         break
 
@@ -76,9 +96,9 @@ class Memento(BaseSepCog, commands.Cog):
 
                     if reminder_dt < now:
                         user = self.bot.get_user(id=int(user_id))  # type: discord.User
-                        id_ = user_reminder.get('id')
+                        id_ = user_reminder.id
                         await self._delete_reminder(user=user, reminder_id=id_)
-                        users_to_notify[user].append(user_reminder.get('text'))
+                        users_to_notify[user].append(user_reminder.text)
                         self.logger.info(f"User reminder queued up. User: {user.id} | id: {id_}")
 
             for user, reminders in users_to_notify.items():
@@ -88,6 +108,13 @@ class Memento(BaseSepCog, commands.Cog):
 
             await asyncio.sleep(self.MONITOR_PROCESS_INTERVAL)
 
+    """
+    Sets the given pytz timezone string as the timezone for the given user.
+    This will overwrite any existing user timezone preference.
+    
+    :param user: Discord.py user for which to set the timezone preference.
+    :param timezone: pytz timezone string. Assumes that validation has already happened.
+    """
     async def _set_user_timezone(self, user: discord.User, timezone: str):
         user_id = str(user.id)
 
@@ -99,41 +126,59 @@ class Memento(BaseSepCog, commands.Cog):
         await self.config.user(user).config.set(cache)
         self.logger.info(f"Updated timezone config for User: {user.id} | Timezone: {timezone}")
 
-    async def _update_user_reminders(self, user: discord.User, reminders: List[Dict]):
+    """
+    Overwrites a user's reminders to the new list of reminders.
+    :param user: discord.py user
+    :param reminders: List of "Reminder" entities to save for the user. Will overwrite any existing reminders.
+    """
+    async def _update_user_reminders(self, user: discord.User, reminders: List[Reminder]):
         self.user_reminder_cache[str(user.id)] = reminders
-        await self.config.user(user).reminders.set(reminders)
+        db_reminders = [r.prepare_for_storage() for r in reminders]
+        await self.config.user(user).reminders.set(db_reminders)
 
+    """
+    Adds a new reminder for the user. Assumes that the reminder datetime has already been converted to UTC.
+    :param user: discord.py user
+    :param reminder_dt: Timezone-agnostic UTC datetime for when the reminder should trigger.
+    :param reminder_text: Text to send to the user in the reminder.
+    """
     async def _set_user_reminder(self, user: discord.User, reminder_dt: datetime.datetime, reminder_text: str):
-        user_reminders = await self._get_use_reminders(user)
-        user_reminders.append({
-            'id': random_string(),
-            'dt': reminder_dt.strftime(self.ISO8601_FORMAT),
-            'text': reminder_text
-        })
+        user_reminders = await self._get_user_reminders(user)
+        user_reminders.append(
+            Reminder(id=random_string(), dt=reminder_dt.strftime(Reminder.ISO8601_FORMAT), text=reminder_text)
+        )
         await self._update_user_reminders(user=user, reminders=user_reminders)
 
-    async def _get_use_reminders(self, user: discord.User) -> List[Dict]:
+    """
+    Retrieves a list of "Reminder" entities from the cache for the given user.
+    :param user: discord.py user
+    """
+    async def _get_user_reminders(self, user: discord.User) -> List[Reminder]:
         user_id = str(user.id)
         return self.user_reminder_cache.get(user_id, [])
 
+    """
+    Deletes a reminder with the given reminder ID for the given user.
+    :param user: discord.py user
+    :param reminder_id: ID of a reminder.
+    """
     async def _delete_reminder(self, user: discord.User, reminder_id: str):
-        current_reminders = await self._get_use_reminders(user)
+        current_reminders = await self._get_user_reminders(user)
         new_reminders = []
 
         if reminder_id is None:
             return
 
         for reminder in current_reminders:
-            if reminder.get("id") != reminder_id:
+            if reminder.id != reminder_id:
                 new_reminders.append(reminder)
 
         await self._update_user_reminders(user=user, reminders=new_reminders)
 
-    async def _get_recurrent_object(self, user_timezone: DstTzInfo) -> recurrent.RecurringEvent:
-        now = datetime.datetime.utcnow()
-        user_now = pytz.UTC.localize(now).astimezone(user_timezone).replace(tzinfo=None)
-        return recurrent.RecurringEvent(now_date=user_now)
-
+    """
+    Retrieves the user's preferred timezone. If the user does not have one set, returns Memento's default.
+    :param user: discord.py user.
+    """
     async def _get_user_timezone(self, user: discord.User) -> DstTzInfo:
         user_timezone = self.user_config_cache.get(str(user.id), {}).get('timezone')
 
@@ -142,6 +187,13 @@ class Memento(BaseSepCog, commands.Cog):
 
         return pytz.timezone(user_timezone)
 
+    """
+    Converts a user's reminder string into a timezone-agnostic UTC datetime, offset from the user's timezone.
+    If the string was not understood, returns None.
+    
+    :param user: discord.py user.
+    :param reminder_time: User supplied reminder string (from command parameters).
+    """
     async def _parse_reminder_time(self, user: discord.User, reminder_time: str) -> Optional[datetime.datetime]:
         user_timezone = await self._get_user_timezone(user)
         user_recurrent = await self._get_recurrent_object(user_timezone)
@@ -151,6 +203,11 @@ class Memento(BaseSepCog, commands.Cog):
             return utc_dt
         return None
 
+    """
+    Parses a Memento command string into the reminder time and reminder message.
+    If the command is not in the correct format, will return None.
+    :param reminder_string: Raw command from the Memento command.
+    """
     def _parse_reminder_string(self, reminder_string: str) -> Optional[Tuple[str, str]]:
         try:
             reminder_time, reminder_message = reminder_string.split("|", maxsplit=1)
@@ -159,6 +216,11 @@ class Memento(BaseSepCog, commands.Cog):
             return None
         return reminder_time, reminder_message
 
+    """
+    Main Memento command to set reminders.
+    :param ctx: Red Bot context.
+    :param reminder_string: Raw string for everything after the prefix and command.
+    """
     @commands.group(name="memento", aliases=['remindme'], invoke_without_command=True)
     async def _memento(self, ctx: Context, *, reminder_string: str):
         reminder_time, reminder_string = self._parse_reminder_string(reminder_string)
@@ -175,6 +237,11 @@ class Memento(BaseSepCog, commands.Cog):
             return
         await ErrorReply("I was unable to understand that time. Please try again.").send(ctx)
 
+    """
+    Memento command for setting the user's timezone preference
+    :param ctx: Red Bot context
+    :param timezone: Raw user supplied timezone string
+    """
     @_memento.command(name="tz", aliases=['timezone'])
     async def _memento_tz(self, ctx: Context, timezone: str):
         pytz_string = TimezoneStrings.get_pytz_string(timezone)
@@ -185,6 +252,3 @@ class Memento(BaseSepCog, commands.Cog):
 
         await self._set_user_timezone(ctx.author, pytz_string)
         await ctx.tick()
-
-
-
