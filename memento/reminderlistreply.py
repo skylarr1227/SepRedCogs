@@ -14,10 +14,9 @@ class ReminderListReply(EmbedReply):
 
     def __init__(self, reminders: List[Reminder]):
         super(ReminderListReply, self).__init__(message="", color=HexColors.Red, emoji=None)
-        self.reminders = reminders
+        self.reminders = sorted(reminders, key=lambda r: r.dt_obj)
 
     def build_message(self):
-
         message = "Here's your current list of reminders:\n\n"
         for index, reminder in enumerate(self.reminders):
             count = index + 1

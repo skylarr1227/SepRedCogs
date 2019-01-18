@@ -253,6 +253,11 @@ class Memento(BaseSepCog, commands.Cog):
         await self._set_user_timezone(ctx.author, pytz_string)
         await ctx.tick()
 
+    """
+    Memento command for retrieving a list of reminders.
+    Responds to the user in a DM with a sorted (by time) list of reminders and their contents.
+    :param ctx: Red Bot context.
+    """
     @_memento.command(name="list")
     async def _memento_list(self, ctx: Context):
 
