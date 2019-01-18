@@ -143,11 +143,13 @@ class Memento(BaseSepCog, commands.Cog):
     :param user: discord.py user
     :param reminder_dt: Timezone-agnostic UTC datetime for when the reminder should trigger.
     :param reminder_text: Text to send to the user in the reminder.
+    :param timezone: pytz timestone string.
     """
-    async def _set_user_reminder(self, user: discord.User, reminder_dt: datetime.datetime, reminder_text: str):
+    async def _set_user_reminder(self, user: discord.User, reminder_dt: datetime.datetime, reminder_text: str,
+                                 timezone: str):
         user_reminders = await self._get_user_reminders(user)
         user_reminders.append(
-            Reminder(dt=reminder_dt.strftime(Reminder.ISO8601_FORMAT), text=reminder_text)
+            Reminder(dt=reminder_dt.strftime(Reminder.ISO8601_FORMAT), text=reminder_text, timezone=timezone)
         )
         self.logger.info("Adding reminder. Time: {} | User: {} | Total Reminders: {}"
                          .format(reminder_dt.strftime(Reminder.ISO8601_FORMAT), user.id, len(user_reminders)))
@@ -181,18 +183,21 @@ class Memento(BaseSepCog, commands.Cog):
         self.logger.info("Deleting reminder for user: Id: {} | User: {}".format(reminder_id, user.id))
         await self._update_user_reminders(user=user, reminders=new_reminders)
 
+    def _get_user_tz_string(self, user: discord.User) -> str:
+        """
+        Retrieves the string value of the user's timezone from the cache/database.
+        If no preference is set, returns Memento's default.
+        :param user: discord.py user
+        :return: User's preferred timezone string (for pytz), or Memento's default if not set.
+        """
+        return self.user_config_cache.get(str(user.id), {}).get('timezone', self.DEFAULT_TIMEZONE)
+
     """
     Retrieves the user's preferred timezone. If the user does not have one set, returns Memento's default.
     :param user: discord.py user.
     """
     async def _get_user_timezone(self, user: discord.User) -> DstTzInfo:
-        user_timezone = self.user_config_cache.get(str(user.id), {}).get('timezone')
-
-        if user_timezone is None:
-            self.logger.debug("User does not have a timezone set. Returning default: {} | User: {}"
-                              .format(self.DEFAULT_TIMEZONE, user.id))
-            return pytz.timezone(self.DEFAULT_TIMEZONE)
-
+        user_timezone = self._get_user_tz_string(user=user)
         return pytz.timezone(user_timezone)
 
     """
@@ -254,10 +259,11 @@ class Memento(BaseSepCog, commands.Cog):
             message += "> **{}**".format(dt_user_tz_str)
 
             confirm_embed = MementoEmbedReply(message=message, title="Confirmation").build()
-            confirmed = await InteractiveActions.yes_or_no_action(ctx=ctx,embed=confirm_embed)
+            confirmed = await InteractiveActions.yes_or_no_action(ctx=ctx, embed=confirm_embed)
 
             if confirmed:
-                await self._set_user_reminder(user=ctx.author, reminder_dt=reminder_dt, reminder_text=reminder_string)
+                await self._set_user_reminder(user=ctx.author, reminder_dt=reminder_dt, reminder_text=reminder_string,
+                                              timezone=self._get_user_tz_string(user=ctx.author))
                 return await ctx.tick()
             return
 
@@ -273,8 +279,10 @@ class Memento(BaseSepCog, commands.Cog):
         pytz_string = TimezoneStrings.get_pytz_string(timezone)
         if pytz_string is None:
             valid_options = ', '.join(TimezoneStrings.get_timezone_options())
-            return await ErrorReply("Timezone is not valid. Please choose from one of {}".format(valid_options))\
-                .send(ctx)
+
+            return await ErrorReply('"{}" is not a valid timezone. Please choose from one of: {}.\n\n'
+                                    'For a ***complete*** list of timezones, see: https://sep.gg/timezones'
+                                    .format(timezone, valid_options)).send(ctx)
 
         await self._set_user_timezone(ctx.author, pytz_string)
         await ctx.tick()

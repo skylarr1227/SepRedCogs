@@ -1,6 +1,7 @@
 import typing
 
 import pytz
+from pytz.tzinfo import DstTzInfo
 
 
 class TimezoneStrings(object):
@@ -30,15 +31,17 @@ class TimezoneStrings(object):
         return sorted(TimezoneStrings._MAP.keys())
 
     @staticmethod
-    def is_valid_timezone(tz: str):
-        return tz.title() in TimezoneStrings._MAP
+    def is_valid_timezone(tz: str) -> bool:
+        return tz.title() in TimezoneStrings._MAP or tz in pytz.all_timezones
 
     @staticmethod
-    def get_pytz_string(tz: str):
+    def get_pytz_string(tz: str) -> str:
         if TimezoneStrings.is_valid_timezone(tz):
+            if tz in pytz.all_timezones:
+                return tz
             return TimezoneStrings._MAP.get(tz)
 
     @staticmethod
-    def get_pytz_timezone(tz: str):
+    def get_pytz_timezone(tz: str) -> DstTzInfo:
         if TimezoneStrings.is_valid_timezone(tz):
             return pytz.timezone(TimezoneStrings.get_pytz_string(tz))
