@@ -22,12 +22,12 @@ from redbot.core.commands import Context
 
 class Memento(BaseSepCog, commands.Cog):
 
-    ISO8601_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
     CONFIRM_DT_FORMAT = "%b %d, %Y @ %I:%M:%S%p"
     DEFAULT_TIMEZONE = 'US/Pacific'
     USER_MESSAGE_INTERVAL = 0.1
     MONITOR_PROCESS_INTERVAL = 5
     MESSAGE_EMOJI = "\N{ALARM CLOCK}"
+    TIMEZONES_URL = "https://sep.gg/timezones"
 
     def __init__(self, bot: Red):
 
@@ -61,7 +61,7 @@ class Memento(BaseSepCog, commands.Cog):
                     try:
                         cache_reminders.append(Reminder(**reminder))
                     except TypeError as e:
-                        self.logger.error("Error converting database reminders to Reminder class. Error: {}".format(e))
+                        self.logger.error(f"Error converting database reminders to Reminder class. Error: {e}")
                         continue
                 user_reminders[str(user_id)] = cache_reminders
 
@@ -97,7 +97,7 @@ class Memento(BaseSepCog, commands.Cog):
                     if dt_string is None:
                         break
 
-                    reminder_dt = datetime.datetime.strptime(dt_string, self.ISO8601_FORMAT)
+                    reminder_dt = datetime.datetime.strptime(dt_string, Reminder.ISO8601_FORMAT)
                     now = datetime.datetime.utcnow()
 
                     if reminder_dt < now:
@@ -159,8 +159,8 @@ class Memento(BaseSepCog, commands.Cog):
         user_reminders.append(
             Reminder(dt=reminder_dt.strftime(Reminder.ISO8601_FORMAT), text=reminder_text, timezone=timezone)
         )
-        self.logger.info("Adding reminder. Time: {} | User: {} | Total Reminders: {}"
-                         .format(reminder_dt.strftime(Reminder.ISO8601_FORMAT), user.id, len(user_reminders)))
+        self.logger.info(f"Adding reminder. Time: {reminder_dt.strftime(Reminder.ISO8601_FORMAT)} "
+                         f"| User: {user.id} | Total Reminders: {len(user_reminders)}")
         await self._update_user_reminders(user=user, reminders=user_reminders)
 
     async def _get_user_reminders(self, user: discord.User) -> List[Reminder]:
@@ -183,14 +183,14 @@ class Memento(BaseSepCog, commands.Cog):
         new_reminders = []
 
         if reminder_id is None:
-            self.logger.debug("User attempted to delete a reminder, but it was not found. Id: {} | User: {}"
-                              .format(reminder_id, user.id))
+            self.logger.debug("User attempted to delete a reminder, but it was not found. "
+                              f"Id: {reminder_id} | User: {user.id}")
             return
 
         for reminder in current_reminders:
             if reminder.id != reminder_id:
                 new_reminders.append(reminder)
-        self.logger.info("Deleting reminder for user: Id: {} | User: {}".format(reminder_id, user.id))
+        self.logger.info(f"Deleting reminder for user: Id: {reminder_id} | User: {user.id}")
         await self._update_user_reminders(user=user, reminders=new_reminders)
 
     def _get_user_tz_string(self, user: discord.User) -> str:
@@ -228,7 +228,7 @@ class Memento(BaseSepCog, commands.Cog):
             dt = user_timezone.localize(user_parsed_time)
             utc_dt = dt.astimezone(tz=pytz.UTC)
             return utc_dt
-        self.logger.debug("Unable to parse user supplied reminder time: {}".format(reminder_time))
+        self.logger.debug(f"Unable to parse user supplied reminder time: {reminder_time}")
         return None
 
     def _parse_reminder_string(self, reminder_string: str) -> Optional[Tuple[str, str]]:
@@ -242,7 +242,7 @@ class Memento(BaseSepCog, commands.Cog):
         try:
             reminder_time, reminder_message = reminder_string.split("|", maxsplit=1)
         except (ValueError, TypeError) as e:
-            self.logger.error("Error parsing reminder string: {} | Error: {}".format(reminder_string, e))
+            self.logger.error("Error parsing reminder string: {reminder_string} | Error: {e}")
             return None
         return reminder_time, reminder_message
 
@@ -276,7 +276,7 @@ class Memento(BaseSepCog, commands.Cog):
             dt_user_tz = reminder_dt.astimezone(await self._get_user_timezone(user=ctx.author))
             dt_user_tz_str = dt_user_tz.strftime(self.CONFIRM_DT_FORMAT)
 
-            confirm_message += "> **{}**".format(dt_user_tz_str)
+            confirm_message += f"> **{dt_user_tz_str}**"
 
             confirm_embed = MementoEmbedReply(message=confirm_message, title="Confirmation").build()
             confirmed = await InteractiveActions.yes_or_no_action(ctx=ctx, embed=confirm_embed)
@@ -302,9 +302,9 @@ class Memento(BaseSepCog, commands.Cog):
         if pytz_string is None:
             valid_options = ', '.join(TimezoneStrings.get_timezone_options())
 
-            return await ErrorReply('"{}" is not a valid timezone. Please choose from one of: {}.\n\n'
-                                    'For a ***complete*** list of timezones, see: https://sep.gg/timezones'
-                                    .format(timezone, valid_options)).send(ctx)
+            return await ErrorReply(f'"{timezone}" is not a valid timezone. '
+                                    f'Please choose from one of: {valid_options}.\n\n'
+                                    f'For a ***complete*** list of timezones, see: {self.TIMEZONES_URL}').send(ctx)
 
         await self._set_user_timezone(ctx.author, pytz_string)
         await ctx.tick()
@@ -346,5 +346,5 @@ class Memento(BaseSepCog, commands.Cog):
                 await self._delete_reminder(user=ctx.author, reminder_id=reminder.id)
                 return await ctx.tick()
 
-        await ErrorReply('You have no reminders with ID "{}". '
-                         'Use the "list" command to get your reminders and their IDs.'.format(id_)).send(ctx)
+        await ErrorReply(f'You have no reminders with ID "{id_}". '
+                         'Use the "list" command to get your reminders and their IDs.').send(ctx)
