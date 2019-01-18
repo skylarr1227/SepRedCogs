@@ -11,6 +11,7 @@ from cog_shared.seplib.responses.embeds import ErrorReply
 from cog_shared.seplib.utils.random_utils import random_string
 from memento.alarmreply import AlarmReply
 from memento.reminder import Reminder
+from memento.reminderlistreply import ReminderListReply
 from memento.timezonestrings import TimezoneStrings
 from pytz.tzinfo import DstTzInfo
 from redbot.core import commands, Config
@@ -96,10 +97,9 @@ class Memento(BaseSepCog, commands.Cog):
 
                     if reminder_dt < now:
                         user = self.bot.get_user(id=int(user_id))  # type: discord.User
-                        id_ = user_reminder.id
-                        await self._delete_reminder(user=user, reminder_id=id_)
+                        await self._delete_reminder(user=user, reminder_id=user_reminder.id)
                         users_to_notify[user].append(user_reminder.text)
-                        self.logger.info(f"User reminder queued up. User: {user.id} | id: {id_}")
+                        self.logger.info(f"User reminder queued up. User: {user.id} | id: {user_reminder.id}")
 
             for user, reminders in users_to_notify.items():
                 for reminder in reminders:
@@ -145,7 +145,7 @@ class Memento(BaseSepCog, commands.Cog):
     async def _set_user_reminder(self, user: discord.User, reminder_dt: datetime.datetime, reminder_text: str):
         user_reminders = await self._get_user_reminders(user)
         user_reminders.append(
-            Reminder(id=random_string(), dt=reminder_dt.strftime(Reminder.ISO8601_FORMAT), text=reminder_text)
+            Reminder(dt=reminder_dt.strftime(Reminder.ISO8601_FORMAT), text=reminder_text)
         )
         await self._update_user_reminders(user=user, reminders=user_reminders)
 
@@ -221,7 +221,7 @@ class Memento(BaseSepCog, commands.Cog):
     :param ctx: Red Bot context.
     :param reminder_string: Raw string for everything after the prefix and command.
     """
-    @commands.group(name="memento", aliases=['remindme'], invoke_without_command=True)
+    @commands.group(name="memento", aliases=['remindme', 'r'], invoke_without_command=True)
     async def _memento(self, ctx: Context, *, reminder_string: str):
         reminder_time, reminder_string = self._parse_reminder_string(reminder_string)
         reminder_dt = await self._parse_reminder_time(user=ctx.author, reminder_time=reminder_time)
@@ -252,3 +252,15 @@ class Memento(BaseSepCog, commands.Cog):
 
         await self._set_user_timezone(ctx.author, pytz_string)
         await ctx.tick()
+
+    @_memento.command(name="list")
+    async def _memento_list(self, ctx: Context):
+
+        user_id = str(ctx.author.id)
+        user_reminders = self.user_reminder_cache.get(user_id)
+
+        # Respond with an error to the current context if the user does not have any reminder set.
+        if not user_reminders:
+            return await ErrorReply("You have no reminders set.").send(ctx)
+
+        await ReminderListReply(reminders=user_reminders).send(ctx.author)
