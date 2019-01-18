@@ -1,19 +1,14 @@
 from datetime import datetime
 from typing import List
 
-import discord
 import timeago
-from cog_shared.seplib.constants.colors import HexColors
-from cog_shared.seplib.responses.embeds import EmbedReply
+from memento.mementoembed import MementoEmbedReply
 from memento.reminder import Reminder
 
 
-class ReminderListReply(EmbedReply):
-    TITLE_EMOJI = "\N{ALARM CLOCK}"
-    TITLE = "{} Reminder List! [Memento]".format(TITLE_EMOJI)
-
+class ReminderListReply(MementoEmbedReply):
     def __init__(self, reminders: List[Reminder]):
-        super(ReminderListReply, self).__init__(message="", color=HexColors.Red, emoji=None)
+        super(ReminderListReply, self).__init__(message="", title="Reminder List!")
         self.reminders = sorted(reminders, key=lambda r: r.dt_obj)
 
     def build_message(self):
@@ -23,6 +18,3 @@ class ReminderListReply(EmbedReply):
             time_string = timeago.format(date=reminder.dt_obj, now=datetime.utcnow())
             message += "{}. **{}** | {} ({})\n".format(count, reminder.text, time_string, reminder.id)
         return message
-
-    def build(self):
-        return discord.Embed(description=self.build_message(), color=self.color, title=self.TITLE)

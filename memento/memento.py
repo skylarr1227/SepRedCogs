@@ -8,8 +8,9 @@ import pytz
 import recurrent
 from cog_shared.seplib.classes.basesepcog import BaseSepCog
 from cog_shared.seplib.responses.embeds import ErrorReply
-from cog_shared.seplib.utils.random_utils import random_string
+from cog_shared.seplib.responses.interactive_actions import InteractiveActions
 from memento.alarmreply import AlarmReply
+from memento.mementoembed import MementoEmbedReply
 from memento.reminder import Reminder
 from memento.reminderlistreply import ReminderListReply
 from memento.timezonestrings import TimezoneStrings
@@ -22,6 +23,7 @@ from redbot.core.commands import Context
 class Memento(BaseSepCog, commands.Cog):
 
     ISO8601_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+    CONFIRM_DT_FORMAT = "%b %d, %Y @ %I:%M:%S%p"
     DEFAULT_TIMEZONE = 'US/Pacific'
     USER_MESSAGE_INTERVAL = 0.1
     MONITOR_PROCESS_INTERVAL = 5
@@ -197,8 +199,10 @@ class Memento(BaseSepCog, commands.Cog):
     async def _parse_reminder_time(self, user: discord.User, reminder_time: str) -> Optional[datetime.datetime]:
         user_timezone = await self._get_user_timezone(user)
         user_recurrent = await self._get_recurrent_object(user_timezone)
-        dt = user_timezone.localize(user_recurrent.parse(reminder_time))
-        if dt is not None:
+        user_parsed_time = user_recurrent.parse(reminder_time)
+
+        if user_parsed_time is not None:
+            dt = user_timezone.localize(user_parsed_time)
             utc_dt = dt.astimezone(tz=pytz.UTC)
             return utc_dt
         return None
@@ -232,9 +236,21 @@ class Memento(BaseSepCog, commands.Cog):
                 await ErrorReply("The time you specified is in the past!").send(ctx)
                 return
 
-            await self._set_user_reminder(user=ctx.author, reminder_dt=reminder_dt, reminder_text=reminder_string)
-            await ctx.tick()
+            message = "Please confirm that the following date/time is correct:\n\n"
+
+            dt_user_tz = reminder_dt.astimezone(await self._get_user_timezone(user=ctx.author))
+            dt_user_tz_str = dt_user_tz.strftime(self.CONFIRM_DT_FORMAT)
+
+            message += "> **{}**".format(dt_user_tz_str)
+
+            confirm_embed = MementoEmbedReply(message=message, title="Confirmation").build()
+            confirmed = await InteractiveActions.yes_or_no_action(ctx=ctx,embed=confirm_embed)
+
+            if confirmed:
+                await self._set_user_reminder(user=ctx.author, reminder_dt=reminder_dt, reminder_text=reminder_string)
+                return await ctx.tick()
             return
+
         await ErrorReply("I was unable to understand that time. Please try again.").send(ctx)
 
     """
