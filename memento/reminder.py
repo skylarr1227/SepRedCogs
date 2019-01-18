@@ -9,7 +9,7 @@ class Reminder(object):
     def __init__(self, dt: str, text: str, timezone: str = None, id: str = None):
         if id is None:
             id = self.generate_random_id(text, dt)
-        self.id = id
+        self.id = id  # type: str
         self.dt_str = dt
         self.dt_obj = datetime.strptime(dt, self.ISO8601_FORMAT)
         self.text = text

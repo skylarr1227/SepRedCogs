@@ -221,7 +221,7 @@ class Memento(BaseSepCog, commands.Cog):
     :param ctx: Red Bot context.
     :param reminder_string: Raw string for everything after the prefix and command.
     """
-    @commands.group(name="memento", aliases=['remindme', 'r'], invoke_without_command=True)
+    @commands.group(name="memento", aliases=['remindme'], invoke_without_command=True)
     async def _memento(self, ctx: Context, *, reminder_string: str):
         reminder_time, reminder_string = self._parse_reminder_string(reminder_string)
         reminder_dt = await self._parse_reminder_time(user=ctx.author, reminder_time=reminder_time)
@@ -269,3 +269,22 @@ class Memento(BaseSepCog, commands.Cog):
             return await ErrorReply("You have no reminders set.").send(ctx)
 
         await ReminderListReply(reminders=user_reminders).send(ctx.author)
+
+    """
+    Deletes a reminder given the ID.
+    :param ctx: Red Bot context.
+    :param id_: ID of the reminder.
+    """
+    @_memento.command(name="delete", aliases=["del"])
+    async def _memento_delete(self, ctx: Context, id_: str):
+        user_id = str(ctx.author.id)
+        user_reminders = self.user_reminder_cache.get(user_id, [])
+
+        for reminder in user_reminders:
+            if reminder.id == id_:
+                await self._delete_reminder(user=ctx.author, reminder_id=reminder.id)
+                self.logger.info("Deleted reminder for user. User: {} | Id: {}".format(ctx.author.id, reminder.id))
+                return await ctx.tick()
+
+        await ErrorReply('You have no reminders with ID "{}". '
+                         'Use the "list" command to get your reminders and their IDs.'.format(id_)).send(ctx)
