@@ -149,6 +149,8 @@ class Memento(BaseSepCog, commands.Cog):
         user_reminders.append(
             Reminder(dt=reminder_dt.strftime(Reminder.ISO8601_FORMAT), text=reminder_text)
         )
+        self.logger.info("Adding reminder. Time: {} | User: {} | Total Reminders: {}"
+                         .format(reminder_dt.strftime(Reminder.ISO8601_FORMAT), user.id, len(user_reminders)))
         await self._update_user_reminders(user=user, reminders=user_reminders)
 
     """
@@ -169,12 +171,14 @@ class Memento(BaseSepCog, commands.Cog):
         new_reminders = []
 
         if reminder_id is None:
+            self.logger.debug("User attempted to delete a reminder, but it was not found. Id: {} | User: {}"
+                              .format(reminder_id, user.id))
             return
 
         for reminder in current_reminders:
             if reminder.id != reminder_id:
                 new_reminders.append(reminder)
-
+        self.logger.info("Deleting reminder for user: Id: {} | User: {}".format(reminder_id, user.id))
         await self._update_user_reminders(user=user, reminders=new_reminders)
 
     """
@@ -185,6 +189,8 @@ class Memento(BaseSepCog, commands.Cog):
         user_timezone = self.user_config_cache.get(str(user.id), {}).get('timezone')
 
         if user_timezone is None:
+            self.logger.debug("User does not have a timezone set. Returning default: {} | User: {}"
+                              .format(self.DEFAULT_TIMEZONE, user.id))
             return pytz.timezone(self.DEFAULT_TIMEZONE)
 
         return pytz.timezone(user_timezone)
@@ -205,6 +211,7 @@ class Memento(BaseSepCog, commands.Cog):
             dt = user_timezone.localize(user_parsed_time)
             utc_dt = dt.astimezone(tz=pytz.UTC)
             return utc_dt
+        self.logger.debug("Unable to parse user supplied reminder time: {}".format(reminder_time))
         return None
 
     """
@@ -215,7 +222,7 @@ class Memento(BaseSepCog, commands.Cog):
     def _parse_reminder_string(self, reminder_string: str) -> Optional[Tuple[str, str]]:
         try:
             reminder_time, reminder_message = reminder_string.split("|", maxsplit=1)
-        except ValueError as e:
+        except (ValueError, TypeError) as e:
             self.logger.error("Error parsing reminder string: {} | Error: {}".format(reminder_string, e))
             return None
         return reminder_time, reminder_message
@@ -227,7 +234,10 @@ class Memento(BaseSepCog, commands.Cog):
     """
     @commands.group(name="memento", aliases=['remindme'], invoke_without_command=True)
     async def _memento(self, ctx: Context, *, reminder_string: str):
-        reminder_time, reminder_string = self._parse_reminder_string(reminder_string)
+        parsed_string = self._parse_reminder_string(reminder_string)
+        if parsed_string is None:
+            return await ctx.send_help()
+        reminder_time, reminder_message = parsed_string
         reminder_dt = await self._parse_reminder_time(user=ctx.author, reminder_time=reminder_time)
 
         if None not in [reminder_dt, reminder_string]:
@@ -299,7 +309,6 @@ class Memento(BaseSepCog, commands.Cog):
         for reminder in user_reminders:
             if reminder.id == id_:
                 await self._delete_reminder(user=ctx.author, reminder_id=reminder.id)
-                self.logger.info("Deleted reminder for user. User: {} | Id: {}".format(ctx.author.id, reminder.id))
                 return await ctx.tick()
 
         await ErrorReply('You have no reminders with ID "{}". '
