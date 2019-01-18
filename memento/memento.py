@@ -265,7 +265,7 @@ class Memento(BaseSepCog, commands.Cog):
         reminder_time, reminder_message = parsed_string
         reminder_dt = await self._parse_reminder_time(user=ctx.author, reminder_time=reminder_time)
 
-        if None not in [reminder_dt, command_str]:
+        if None not in [reminder_dt, reminder_message]:
 
             if reminder_dt <= datetime.datetime.now(tz=pytz.UTC):
                 await ErrorReply("The time you specified is in the past!").send(ctx)
@@ -282,7 +282,7 @@ class Memento(BaseSepCog, commands.Cog):
             confirmed = await InteractiveActions.yes_or_no_action(ctx=ctx, embed=confirm_embed)
 
             if confirmed:
-                await self._set_user_reminder(user=ctx.author, reminder_dt=reminder_dt, reminder_text=command_str,
+                await self._set_user_reminder(user=ctx.author, reminder_dt=reminder_dt, reminder_text=reminder_message,
                                               timezone=self._get_user_tz_string(user=ctx.author))
                 return await ctx.tick()
             return
