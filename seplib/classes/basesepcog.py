@@ -54,5 +54,5 @@ class BaseSepCog(ABC):
         self._futures.append(coroutine)
 
     def _ensure_futures(self):
-        for coro in self._futures:
-            asyncio.ensure_future(coro)
+        for coroutine in self._futures:
+            asyncio.ensure_future(coroutine)

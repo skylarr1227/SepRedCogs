@@ -3,8 +3,12 @@
     "install_msg" : "**WARNING:** This is a cog specifically designed for sep.gg. It is not intended for use anywhere else and is open sourced for educational purposes only.",
     "name" : "SepGG",
     "short" : "Collection of commands for sep.gg",
-    "description" : "Collection of commands for sep.gg",
+    "description" : "Collection of commands for sep.gg. Shortlinks require AWSConfig cog to be configured.",
     "tags" : ["utility"],
+    "required_cogs": {
+        "seplib": "https://github.com/Seputaes/SepRedCogs.git",
+        "awsconfig": "https://github.com/Seputaes/SepRedCogs.git"
+    },
     "requirements" : ["boto3"],
     "hidden" : false
 }

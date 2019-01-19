@@ -2,8 +2,9 @@ import boto3
 
 class SQS(object):
 
-    def __init__(self, access_key: str, access_secret: str, region='us-east-1'):
-        self._session = boto3.session.Session(aws_access_key_id=access_key, aws_secret_access_key=access_secret,
+    def __init__(self, aws_access_key_id: str, aws_secret_access_key: str, region='us-east-1'):
+        self._session = boto3.session.Session(aws_access_key_id=aws_access_key_id,
+                                              aws_secret_access_key=aws_secret_access_key,
                                               region_name=region)
 
         self._queue_map = {}
