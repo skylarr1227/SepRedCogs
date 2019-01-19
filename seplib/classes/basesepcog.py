@@ -4,7 +4,6 @@ import logging
 from abc import ABC, abstractmethod
 from typing import List, Coroutine
 
-from cog_shared.seplib.logging.cloudwatch import set_cloudwatch_handler
 from redbot.core import Config
 from redbot.core.bot import Red
 
@@ -23,7 +22,6 @@ class BaseSepCog(ABC):
         self.logger.setLevel(logging.INFO)
 
         self._futures = []  # type: List[Coroutine]
-        self._futures.append(set_cloudwatch_handler(cog=self, bot=self.bot, logger=self.logger))
         self._futures.append(self._init_cache())
 
     @abstractmethod

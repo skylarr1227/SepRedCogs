@@ -6,9 +6,6 @@
     "short" : "Library with helper and utility classes for use in other cogs.",
     "description" : "Library with helper and utility classes for use in other cogs.",
     "tags" : ["library", "utility"],
-    "required_cogs": {
-        "awsconfig": "https://github.com/Seputaes/SepRedCogs.git"
-    },
-    "requirements" : ["boto3", "watchtower"],
+    "requirements" : ["boto3"],
     "hidden" : false
 }
