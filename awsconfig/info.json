@@ -1,0 +1,10 @@
+{
+    "author" : ["sep#0001"],
+    "install_msg" : "AWS Config cog installed. For security purposes, all commands MUST be executed in a DM to the bot.",
+    "name" : "AWSConfig",
+    "short" : "AWSConfig is a simple cog used to store AWS connection configuration which can be consumed by other cogs.",
+    "description" : "AWSConfig is a simple cog used to store AWS connection configuration which can be consumed by other cogs. The configuration stored in this cog is AWS Access Key ID, AWS Secret Access Key, and AWS region.",
+    "tags" : ["utility"],
+    "requirements" : [],
+    "hidden" : false
+}
