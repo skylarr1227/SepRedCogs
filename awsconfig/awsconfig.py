@@ -31,6 +31,8 @@ class AWSConfig(BaseSepCog, commands.Cog):
         Retrieve the cached AWS configuration.
         :return: Cached AWS configuration dict with key_id, secret, and region.
         """
+        if not self.__aws_config_cache:
+            self.__aws_config_cache = await self.config.aws_config()
         return self.__aws_config_cache
 
     async def _update_aws_config(self, aws_config: Dict[str, str]):
