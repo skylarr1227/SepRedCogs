@@ -14,8 +14,9 @@ from memento.embeds.mementoembed import MementoEmbedReply
 from memento.types.reminder import Reminder
 from memento.embeds.reminderlistreply import ReminderListReply
 from memento.data.timezonestrings import TimezoneStrings
+from memento.types.channelreminder import ChannelReminder
 from pytz.tzinfo import DstTzInfo
-from redbot.core import commands, Config, checks
+from redbot.core import commands, Config
 from redbot.core.bot import Red
 from redbot.core.commands import Context
 
@@ -24,7 +25,7 @@ class Memento(BaseSepCog, commands.Cog):
 
     CONFIRM_DT_FORMAT = "%b %d, %Y @ %I:%M:%S%p"
     DEFAULT_TIMEZONE = 'US/Pacific'
-    USER_MESSAGE_INTERVAL = 0.1
+    MESSAGE_INTERVAL = 0.1
     MONITOR_PROCESS_INTERVAL = 5
     MESSAGE_EMOJI = "\N{ALARM CLOCK}"
     TIMEZONES_URL = "https://sep.gg/timezones"
@@ -34,6 +35,7 @@ class Memento(BaseSepCog, commands.Cog):
         super(Memento, self).__init__(bot=bot)
         self.user_config_cache = {}
         self.user_reminder_cache = {}  # type: Dict[str, List[Reminder]]
+        self.channel_reminder_cache = {}  # type: Dict[str, List[ChannelReminder]]
 
         self._add_future(self.__monitor_reminders())
         self._ensure_futures()
@@ -41,14 +43,18 @@ class Memento(BaseSepCog, commands.Cog):
     def _register_config_entities(self, config: Config):
         config.register_user(config={})
         config.register_user(reminders=[])
+        config.register_channel(reminders=[])
 
     async def _init_cache(self):
         await self.bot.wait_until_ready()
 
         users = await self.config.all_users()
+        channels = await self.config.all_channels()
 
         user_config = {}
         user_reminders = {}
+
+        channel_reminders = {}
 
         for user_id, user_dict in users.items():
             config = user_dict.get('config')
@@ -65,8 +71,23 @@ class Memento(BaseSepCog, commands.Cog):
                         continue
                 user_reminders[str(user_id)] = cache_reminders
 
+        for channel_id, channel_dict in channels.items():
+            reminders = channel_dict.get('reminders')
+            if reminders is not None:
+                chan_reminder_obj = []
+                for reminder in reminders:
+                    try:
+                        chan_reminder_obj.append(ChannelReminder(**reminder))
+                    except TypeError as e:
+                        self.logger.error(f"Error converting database role reminders to RoleReminder class. Error: {e}")
+                        continue
+                channel_reminders[str(channel_id)] = chan_reminder_obj
+
+                channel_reminders[str(channel_id)] = reminders
+
         self.user_config_cache = user_config
         self.user_reminder_cache = user_reminders
+        self.channel_reminder_cache = channel_reminders
 
     @staticmethod
     async def _get_recurrent_object(user_timezone: DstTzInfo) -> recurrent.RecurringEvent:
@@ -90,6 +111,7 @@ class Memento(BaseSepCog, commands.Cog):
 
         while self == self.bot.get_cog(self.__class__.__name__):
             users_to_notify = defaultdict(list)  # type: Dict[discord.User, List[str]]
+            channels_to_notify = defaultdict(list)  # type: Dict[discord.TextChannel, List[ChannelReminder]]
 
             for user_id, user_reminders in self.user_reminder_cache.items():
                 for user_reminder in user_reminders:
@@ -100,20 +122,45 @@ class Memento(BaseSepCog, commands.Cog):
                     reminder_dt = datetime.datetime.strptime(dt_string, Reminder.ISO8601_FORMAT)
                     now = datetime.datetime.utcnow()
 
-                    if reminder_dt < now:
+                    if reminder_dt <= now:
                         user = self.bot.get_user(id=int(user_id))  # type: discord.User
                         await self._delete_reminder(user=user, reminder_id=user_reminder.id)
                         users_to_notify[user].append(user_reminder.text)
                         self.logger.info(f"User reminder queued up. User: {user.id} | id: {user_reminder.id}")
 
+            for channel_id, channel_reminders in self.channel_reminder_cache.items():
+                for channel_reminder in channel_reminders:
+                    dt_string = channel_reminder.dt_str
+                    if dt_string is None:
+                        break
+
+                    reminder_dt = datetime.datetime.strptime(dt_string, ChannelReminder.ISO8601_FORMAT)
+                    now = datetime.datetime.utcnow()
+
+                    if reminder_dt <= now:
+                        channel = self.bot.get_channel(id=int(channel_id))  # type: discord.TextChannel
+                        await self._delete_channel_reminder(channel=channel, reminder_id=channel_reminder.id)
+                        channels_to_notify[channel].append(channel_reminder)
+                        self.logger.info(f"Role/Channel reminder queued up. Role: {channel_reminder.role_id} | "
+                                         f"Channel: {channel.id} | id: {channel_reminder.id}")
+
             for user, reminders in users_to_notify.items():
                 for reminder in reminders:
                     await AlarmReply(message=reminder).send(user)
-                    await asyncio.sleep(self.USER_MESSAGE_INTERVAL)
+                    await asyncio.sleep(self.MESSAGE_INTERVAL)
+
+            for channel, c_reminders in channels_to_notify.items():
+                for cr in c_reminders:
+                    role = channel.guild.get_role(int(cr.role_id))  # type: discord.Role
+                    embed_reply = AlarmReply(message=cr.text)
+                    embed_reply.content = role.mention
+                    await embed_reply.send(channel)
+                    await asyncio.sleep(self.MESSAGE_INTERVAL)
 
             await asyncio.sleep(self.MONITOR_PROCESS_INTERVAL)
 
-    def _check_permissions(self, channel: discord.TextChannel, role: discord.Role) -> Tuple[bool, str]:
+    @staticmethod
+    def _check_permissions(channel: discord.TextChannel, role: discord.Role) -> Tuple[bool, str]:
         """
         Utility method to determine if the bot has the necessary permissions to use the functions of the Cog
         on the specified channel and role.
@@ -124,15 +171,15 @@ class Memento(BaseSepCog, commands.Cog):
         """
 
         if channel.guild is None:
-            response = (False, "The specified channel is not part of a server.")
+            response = (False, f"Channel `{channel.name}` is not part of a server.")
         elif not isinstance(channel, discord.TextChannel):
-            response = (False, "That channel is not a Text channel.")
+            response = (False, f"Channel `{channel.name}` is not a Text channel.")
         elif channel.guild != role.guild:
             response = (False, "The role and channel are not part of the same server.")
-        elif channel.guild.me.guild_permissions.send_messages is False:
-            response = (False, "The bot does not have permission to speak in that channel.")
+        elif channel.permissions_for(channel.guild.me).send_messages is False:
+            response = (False, f"I do not have permission to send messages to channel `{channel.name}`.")
         elif role.mentionable is False:
-            response = (False, "That role is not able to be mentioned.")
+            response = (False, f"Role `{role.name}` is not able to be mentioned.")
         else:
             response = (True, "Bot passed all permissions checks.")
 
@@ -169,6 +216,11 @@ class Memento(BaseSepCog, commands.Cog):
         db_reminders = [r.prepare_for_storage() for r in reminders]
         await self.config.user(user).reminders.set(db_reminders)
 
+    async def _update_channel_reminders(self, channel: discord.TextChannel, reminders: List[ChannelReminder]):
+        self.channel_reminder_cache[str(channel.id)] = reminders
+        db_reminders = [rr.prepare_for_storage() for rr in reminders]
+        await self.config.channel(channel).reminders.set(db_reminders)
+
     async def _set_user_reminder(self, user: discord.User, reminder_dt: datetime.datetime, reminder_text: str,
                                  timezone: str):
         """
@@ -188,6 +240,19 @@ class Memento(BaseSepCog, commands.Cog):
                          f"| User: {user.id} | Total Reminders: {len(user_reminders)}")
         await self._update_user_reminders(user=user, reminders=user_reminders)
 
+    async def _set_channel_reminder(self, channel: discord.TextChannel, role: discord.Role,
+                                    reminder_dt: datetime.datetime, reminder_text: str, timezone: str):
+
+        channel_reminders = await self._get_channel_reminders(channel=channel)
+        channel_reminders.append(
+            ChannelReminder(dt=reminder_dt.strftime(ChannelReminder.ISO8601_FORMAT), text=reminder_text,
+                            timezone=timezone, role_id=str(role.id))
+        )
+        self.logger.info(f"Adding reminder. Time: {reminder_dt.strftime(Reminder.ISO8601_FORMAT)} "
+                         f"| Role: {role.id} | Channel: {channel.id} | "
+                         f"Total Reminders For Channel: {len(channel_reminders)}")
+        await self._update_channel_reminders(channel=channel, reminders=channel_reminders)
+
     async def _get_user_reminders(self, user: discord.User) -> List[Reminder]:
         """
         Retrieves a list of Reminders from the cache for the given user.
@@ -196,6 +261,9 @@ class Memento(BaseSepCog, commands.Cog):
         """
         user_id = str(user.id)
         return self.user_reminder_cache.get(user_id, [])
+
+    async def _get_channel_reminders(self, channel: discord.TextChannel) -> List[ChannelReminder]:
+        return self.channel_reminder_cache.get(str(channel.id), [])
 
     async def _delete_reminder(self, user: discord.User, reminder_id: str):
         """
@@ -217,6 +285,19 @@ class Memento(BaseSepCog, commands.Cog):
                 new_reminders.append(reminder)
         self.logger.info(f"Deleting reminder for user: Id: {reminder_id} | User: {user.id}")
         await self._update_user_reminders(user=user, reminders=new_reminders)
+
+    async def _delete_channel_reminder(self, channel: discord.TextChannel, reminder_id: str):
+        current_channel_reminders = await self._get_channel_reminders(channel)
+        new_reminders = []
+
+        if reminder_id is None:
+            return
+
+        for rr in current_channel_reminders:
+            if rr.id != reminder_id:
+                new_reminders.append(rr)
+        self.logger.info(f"Deleting reminder for role/channel: Id: {reminder_id} | Channel: {channel.id}")
+        await self._update_channel_reminders(channel=channel, reminders=new_reminders)
 
     def _get_user_tz_string(self, user: discord.User) -> str:
         """
@@ -267,7 +348,7 @@ class Memento(BaseSepCog, commands.Cog):
         try:
             reminder_time, reminder_message = reminder_string.split("|", maxsplit=1)
         except (ValueError, TypeError) as e:
-            self.logger.error("Error parsing reminder string: {reminder_string} | Error: {e}")
+            self.logger.error(f"Error parsing reminder string: {reminder_string} | Error: {e}")
             return None
         return reminder_time, reminder_message
 
@@ -296,14 +377,15 @@ class Memento(BaseSepCog, commands.Cog):
                 await ErrorReply("The time you specified is in the past!").send(ctx)
                 return
 
-            confirm_message = "Please confirm that the following date/time is correct:\n\n"
+            confirm_message = f"Great! I'll remind you {ctx.author.mention} when the time comes.\n"
+            confirm_message += "Please confirm that the following date/time is correct:\n\n"
 
             dt_user_tz = reminder_dt.astimezone(await self._get_user_timezone(user=ctx.author))
             dt_user_tz_str = dt_user_tz.strftime(self.CONFIRM_DT_FORMAT)
 
             confirm_message += f"> **{dt_user_tz_str}**"
 
-            confirm_embed = MementoEmbedReply(message=confirm_message, title="Confirmation").build()
+            confirm_embed = MementoEmbedReply(message=confirm_message, title="Reminder Confirmation").build()
             confirmed = await InteractiveActions.yes_or_no_action(ctx=ctx, embed=confirm_embed)
 
             if confirmed:
@@ -374,10 +456,9 @@ class Memento(BaseSepCog, commands.Cog):
         await ErrorReply(f'You have no reminders with ID "{id_}". '
                          'Use the "list" command to get your reminders and their IDs.').send(ctx)
 
-    @commands.group(name="remindrole", aliases=["mementorole"], invoke_without_command=True)
+    @commands.command(name="remindrole", aliases=["mementorole"], invoke_without_command=True)
     @commands.guild_only()
     async def _remindrole(self, ctx: Context, role: discord.Role, channel: discord.TextChannel, *, command_str: str):
-
         bot_passed, response = self._check_permissions(channel=channel, role=role)
 
         if not bot_passed:
@@ -395,18 +476,22 @@ class Memento(BaseSepCog, commands.Cog):
                 await ErrorReply("The time you specified is in the past!").send(ctx)
                 return
 
-            confirm_message = "Please confirm that the following date/time is correct:\n\n"
+            confirm_message = f"Great! I'll remind `{role.name}` in channel `{channel.name}` when the time comes.\n"
+            confirm_message += "Please confirm that the following date/time is correct:\n\n"
 
             dt_user_tz = reminder_dt.astimezone(await self._get_user_timezone(user=ctx.author))
             dt_user_tz_str = dt_user_tz.strftime(self.CONFIRM_DT_FORMAT)
 
             confirm_message += f"> **{dt_user_tz_str}**"
 
-            confirm_embed = MementoEmbedReply(message=confirm_message, title="Confirmation").build()
+            confirm_embed = MementoEmbedReply(message=confirm_message,
+                                              title="Role/Channel Reminder Confirmation").build()
             confirmed = await InteractiveActions.yes_or_no_action(ctx=ctx, embed=confirm_embed)
 
             if confirmed:
-                await ctx.send(f"{role.name} | {channel.name} | {dt_user_tz}")
+                await self._set_channel_reminder(channel=channel, role=role, reminder_dt=reminder_dt,
+                                                 reminder_text=reminder_message,
+                                                 timezone=self._get_user_tz_string(user=ctx.author))
                 return await ctx.tick()
             return
 

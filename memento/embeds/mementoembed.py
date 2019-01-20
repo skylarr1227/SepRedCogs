@@ -10,7 +10,7 @@ class MementoEmbedReply(EmbedReply):
     def __init__(self, title: str, message: str, color=HexColors.Red):
         super(MementoEmbedReply, self).__init__(message=message, emoji=None, color=color)
         self.title_text = title
-        self.TITLE = "{} {} [Memento]".format(self.TITLE_EMOJI, self.title_text)
+        self.TITLE = "{} {}".format(self.TITLE_EMOJI, self.title_text)
 
     def build(self):
         return discord.Embed(description=self.build_message(), color=self.color, title=self.TITLE)
