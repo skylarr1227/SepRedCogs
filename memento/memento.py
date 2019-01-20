@@ -1,7 +1,7 @@
 import asyncio
 import datetime
 from collections import defaultdict
-from typing import Optional, Tuple, List, Dict
+from typing import Optional, Tuple, List, Dict, Union
 
 import discord
 import pytz
@@ -10,7 +10,9 @@ from cog_shared.seplib.classes.basesepcog import BaseSepCog
 from cog_shared.seplib.responses.embeds import ErrorReply
 from cog_shared.seplib.responses.interactive_actions import InteractiveActions
 from memento.embeds.alarmreply import AlarmReply
+from memento.embeds.channelreminderlistreply import ChannelReminderListReply
 from memento.embeds.mementoembed import MementoEmbedReply
+from memento.embeds.rolereminderlistreply import RoleReminderListReply
 from memento.types.reminder import Reminder
 from memento.embeds.reminderlistreply import ReminderListReply
 from memento.data.timezonestrings import TimezoneStrings
@@ -82,8 +84,6 @@ class Memento(BaseSepCog, commands.Cog):
                         self.logger.error(f"Error converting database role reminders to RoleReminder class. Error: {e}")
                         continue
                 channel_reminders[str(channel_id)] = chan_reminder_obj
-
-                channel_reminders[str(channel_id)] = reminders
 
         self.user_config_cache = user_config
         self.user_reminder_cache = user_reminders
@@ -456,7 +456,7 @@ class Memento(BaseSepCog, commands.Cog):
         await ErrorReply(f'You have no reminders with ID "{id_}". '
                          'Use the "list" command to get your reminders and their IDs.').send(ctx)
 
-    @commands.command(name="remindrole", aliases=["mementorole"], invoke_without_command=True)
+    @commands.group(name="remindrole", aliases=["mementorole"], invoke_without_command=True)
     @commands.guild_only()
     async def _remindrole(self, ctx: Context, role: discord.Role, channel: discord.TextChannel, *, command_str: str):
         bot_passed, response = self._check_permissions(channel=channel, role=role)
@@ -496,3 +496,57 @@ class Memento(BaseSepCog, commands.Cog):
             return
 
         await ErrorReply("I was unable to understand that time. Please try again.").send(ctx)
+
+    @_remindrole.command(name="list")
+    @commands.guild_only()
+    async def _remindrole_list(self, ctx: Context, channel_or_role: Union[discord.TextChannel, discord.Role, str]):
+        """
+        Lists all active reminders for the specified channel or role.
+        """
+
+        if isinstance(channel_or_role, discord.TextChannel):
+            channel = channel_or_role
+            reminder_cache = self.channel_reminder_cache.get(str(channel.id))
+            if not reminder_cache:
+                return await ErrorReply(f"There are no active reminders for channel `{channel.name}`").send(ctx)
+
+            embed_reply = ChannelReminderListReply(reminders=reminder_cache, channel=channel)
+            return await embed_reply.send(ctx.author)
+
+        elif isinstance(channel_or_role, discord.Role):
+            role = channel_or_role
+
+            reminders_for_role = []  # type: List[Tuple[ChannelReminder, discord.TextChannel]]
+
+            for channel_id, channel_reminders in self.channel_reminder_cache.items():
+                channel = role.guild.get_channel(int(channel_id))  # type: Optional[discord.TextChannel]
+                if not channel:
+                    self.logger.error(f"Unable to locate channel with ID using the role's guild. "
+                                      f"Channel {channel_id} | Role: {role.id} | Guild: {role.guild.id}")
+                    continue
+
+                for reminder in channel_reminders:
+                    if reminder.role_id == str(role.id):
+                        reminders_for_role.append((reminder, channel))
+
+            if not reminders_for_role:
+                return await ErrorReply(f"There are not active reminders for role `{role.name}`").send(ctx)
+
+            embed_reply = RoleReminderListReply(reminders=reminders_for_role, role=role)
+            return await embed_reply.send(ctx.author)
+
+        self.logger.info(f"An unknown type was found for channel_or_role. Data: {channel_or_role}.")
+        return await ErrorReply(f'Channel or Role "{channel_or_role}" not found.').send(ctx)
+
+    @_remindrole.command(name="delete", aliases=["del"])
+    async def _remindrole_delete(self, ctx: Context, id_: str):
+
+        for channel_id, channel_reminders in self.channel_reminder_cache.items():
+            for cr in channel_reminders:
+                if cr.id == id_:
+                    channel = self.bot.get_channel(int(channel_id))  # type: discord.TextChannel
+                    await self._delete_channel_reminder(channel=channel, reminder_id=cr.id)
+                    return await ctx.tick()
+
+        await ErrorReply(f'You have no Role/Channel reminders with ID "{id_}".'
+                         'Use the "list" command to get the active reminders and their IDs.').send(ctx)
