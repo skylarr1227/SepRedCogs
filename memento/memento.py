@@ -15,7 +15,7 @@ from memento.types.reminder import Reminder
 from memento.embeds.reminderlistreply import ReminderListReply
 from memento.data.timezonestrings import TimezoneStrings
 from pytz.tzinfo import DstTzInfo
-from redbot.core import commands, Config
+from redbot.core import commands, Config, checks
 from redbot.core.bot import Red
 from redbot.core.commands import Context
 
@@ -112,6 +112,31 @@ class Memento(BaseSepCog, commands.Cog):
                     await asyncio.sleep(self.USER_MESSAGE_INTERVAL)
 
             await asyncio.sleep(self.MONITOR_PROCESS_INTERVAL)
+
+    def _check_permissions(self, channel: discord.TextChannel, role: discord.Role) -> Tuple[bool, str]:
+        """
+        Utility method to determine if the bot has the necessary permissions to use the functions of the Cog
+        on the specified channel and role.
+
+        :param channel: Channel on which to check permissions.
+        :return: Tuple[bool, str]. bool is whether the bot has all the necessary permissions, str is the response
+                error message explaining the failing permission.
+        """
+
+        if channel.guild is None:
+            response = (False, "The specified channel is not part of a server.")
+        elif not isinstance(channel, discord.TextChannel):
+            response = (False, "That channel is not a Text channel.")
+        elif channel.guild != role.guild:
+            response = (False, "The role and channel are not part of the same server.")
+        elif channel.guild.me.guild_permissions.send_messages is False:
+            response = (False, "The bot does not have permission to speak in that channel.")
+        elif role.mentionable is False:
+            response = (False, "That role is not able to be mentioned.")
+        else:
+            response = (True, "Bot passed all permissions checks.")
+
+        return response
 
     async def _set_user_timezone(self, user: discord.User, timezone: str):
         """
@@ -348,3 +373,41 @@ class Memento(BaseSepCog, commands.Cog):
 
         await ErrorReply(f'You have no reminders with ID "{id_}". '
                          'Use the "list" command to get your reminders and their IDs.').send(ctx)
+
+    @commands.group(name="remindrole", aliases=["mementorole"], invoke_without_command=True)
+    @commands.guild_only()
+    async def _remindrole(self, ctx: Context, role: discord.Role, channel: discord.TextChannel, *, command_str: str):
+
+        bot_passed, response = self._check_permissions(channel=channel, role=role)
+
+        if not bot_passed:
+            return await ErrorReply(response).send(ctx)
+
+        parsed_command = self._parse_reminder_string(command_str)
+        if parsed_command is None:
+            return ErrorReply("Unable to parse the command. Please check the help docs for usage.").send(ctx)
+
+        reminder_time, reminder_message = parsed_command
+        reminder_dt = await self._parse_reminder_time(user=ctx.author, reminder_time=reminder_time)
+
+        if None not in [reminder_dt, reminder_message]:
+            if reminder_dt <= datetime.datetime.now(tz=pytz.UTC):
+                await ErrorReply("The time you specified is in the past!").send(ctx)
+                return
+
+            confirm_message = "Please confirm that the following date/time is correct:\n\n"
+
+            dt_user_tz = reminder_dt.astimezone(await self._get_user_timezone(user=ctx.author))
+            dt_user_tz_str = dt_user_tz.strftime(self.CONFIRM_DT_FORMAT)
+
+            confirm_message += f"> **{dt_user_tz_str}**"
+
+            confirm_embed = MementoEmbedReply(message=confirm_message, title="Confirmation").build()
+            confirmed = await InteractiveActions.yes_or_no_action(ctx=ctx, embed=confirm_embed)
+
+            if confirmed:
+                await ctx.send(f"{role.name} | {channel.name} | {dt_user_tz}")
+                return await ctx.tick()
+            return
+
+        await ErrorReply("I was unable to understand that time. Please try again.").send(ctx)
