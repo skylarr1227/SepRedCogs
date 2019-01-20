@@ -1,4 +1,4 @@
-from memento.mementoembed import MementoEmbedReply
+from memento.embeds.mementoembed import MementoEmbedReply
 
 
 class AlarmReply(MementoEmbedReply):

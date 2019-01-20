@@ -9,11 +9,11 @@ import recurrent
 from cog_shared.seplib.classes.basesepcog import BaseSepCog
 from cog_shared.seplib.responses.embeds import ErrorReply
 from cog_shared.seplib.responses.interactive_actions import InteractiveActions
-from memento.alarmreply import AlarmReply
-from memento.mementoembed import MementoEmbedReply
-from memento.reminder import Reminder
-from memento.reminderlistreply import ReminderListReply
-from memento.timezonestrings import TimezoneStrings
+from memento.embeds.alarmreply import AlarmReply
+from memento.embeds.mementoembed import MementoEmbedReply
+from memento.types.reminder import Reminder
+from memento.embeds.reminderlistreply import ReminderListReply
+from memento.data.timezonestrings import TimezoneStrings
 from pytz.tzinfo import DstTzInfo
 from redbot.core import commands, Config
 from redbot.core.bot import Red

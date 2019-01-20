@@ -2,8 +2,8 @@ from datetime import datetime
 from typing import List
 
 import timeago
-from memento.mementoembed import MementoEmbedReply
-from memento.reminder import Reminder
+from memento.embeds.mementoembed import MementoEmbedReply
+from memento.types.reminder import Reminder
 
 
 class ReminderListReply(MementoEmbedReply):
