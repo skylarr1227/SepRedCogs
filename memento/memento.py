@@ -18,7 +18,7 @@ from memento.embeds.reminderlistreply import ReminderListReply
 from memento.data.timezonestrings import TimezoneStrings
 from memento.types.channelreminder import ChannelReminder
 from pytz.tzinfo import DstTzInfo
-from redbot.core import commands, Config
+from redbot.core import commands, Config, checks
 from redbot.core.bot import Red
 from redbot.core.commands import Context
 
@@ -81,7 +81,7 @@ class Memento(BaseSepCog, commands.Cog):
                     try:
                         chan_reminder_obj.append(ChannelReminder(**reminder))
                     except TypeError as e:
-                        self.logger.error(f"Error converting database role reminders to RoleReminder class. Error: {e}")
+                        self.logger.error(f"Error converting database role reminders to ChannelReminder class. Error: {e}")
                         continue
                 channel_reminders[str(channel_id)] = chan_reminder_obj
 
@@ -217,6 +217,13 @@ class Memento(BaseSepCog, commands.Cog):
         await self.config.user(user).reminders.set(db_reminders)
 
     async def _update_channel_reminders(self, channel: discord.TextChannel, reminders: List[ChannelReminder]):
+        """
+        Overwrites a channel's reminders to the new list of reminders.
+        :param channel: discord.py Channel
+        :param reminders: List of "ChannelReminder" entities to save for the channel.
+                          Will overwrite any existing reminders.
+        :return: None
+        """
         self.channel_reminder_cache[str(channel.id)] = reminders
         db_reminders = [rr.prepare_for_storage() for rr in reminders]
         await self.config.channel(channel).reminders.set(db_reminders)
@@ -242,6 +249,16 @@ class Memento(BaseSepCog, commands.Cog):
 
     async def _set_channel_reminder(self, channel: discord.TextChannel, role: discord.Role,
                                     reminder_dt: datetime.datetime, reminder_text: str, timezone: str):
+        """
+        Adds a new reminder for a channel. Assumes that the reminder datetime has already been converted to UTC>
+
+        :param channel: discord.py text channel
+        :param role: discord.py role
+        :param reminder_dt: Timezone-agnostic UTC datetime for when the reminder should trigger.
+        :param reminder_text: Text to send to the user in the reminder.
+        :param timezone: pytz timestone string.
+        :return: None
+        """
 
         channel_reminders = await self._get_channel_reminders(channel=channel)
         channel_reminders.append(
@@ -263,6 +280,11 @@ class Memento(BaseSepCog, commands.Cog):
         return self.user_reminder_cache.get(user_id, [])
 
     async def _get_channel_reminders(self, channel: discord.TextChannel) -> List[ChannelReminder]:
+        """
+        Retrieves a list of ChannelReminders from the cache for the given channel.
+        :param channel: discord.py text channel
+        :return: List of ChannelReminders for the channel.
+        """
         return self.channel_reminder_cache.get(str(channel.id), [])
 
     async def _delete_reminder(self, user: discord.User, reminder_id: str):
@@ -287,6 +309,12 @@ class Memento(BaseSepCog, commands.Cog):
         await self._update_user_reminders(user=user, reminders=new_reminders)
 
     async def _delete_channel_reminder(self, channel: discord.TextChannel, reminder_id: str):
+        """
+        Deletes a reminder with the given reminder ID for the given channel.
+        :param channel: discord.py text channel
+        :param reminder_id: Unique ID of the reminder
+        :return: None
+        """
         current_channel_reminders = await self._get_channel_reminders(channel)
         new_reminders = []
 
@@ -355,7 +383,9 @@ class Memento(BaseSepCog, commands.Cog):
     @commands.group(name="memento", aliases=['remindme'], invoke_without_command=True)
     async def _memento(self, ctx: Context, *, command_str: str):
         """
-        Sets a reminder at a specified time and a message which the bot will DM you, in the format of: time | message
+        Sets a reminder at a specified time and a message which the bot will DM you. Be sure you have set your appropriate timezone with `[p]memento tz`.
+
+        Command format: <time string> | <message>
 
         You can use common natural language for the time. For example:
 
@@ -433,17 +463,12 @@ class Memento(BaseSepCog, commands.Cog):
 
         await ReminderListReply(reminders=user_reminders).send(ctx.author)
 
-    """
-    Deletes a reminder given the ID.
-    :param ctx: Red Bot context.
-    :param id_: ID of the reminder.
-    """
     @_memento.command(name="delete", aliases=["del"])
     async def _memento_delete(self, ctx: Context, id_: str):
         """
         Deletes a reminder for the given ID.
 
-        You can get the ID of the reminder by using the "list" command.
+        You can get the ID of the reminder by using the `[p]memento list` command.
         """
         user_id = str(ctx.author.id)
         user_reminders = self.user_reminder_cache.get(user_id, [])
@@ -458,7 +483,21 @@ class Memento(BaseSepCog, commands.Cog):
 
     @commands.group(name="remindrole", aliases=["mementorole"], invoke_without_command=True)
     @commands.guild_only()
+    @checks.mod_or_permissions()
     async def _remindrole(self, ctx: Context, role: discord.Role, channel: discord.TextChannel, *, command_str: str):
+        """
+        Sets a reminder which will mention a role with a custom message at a given time. Be sure you have set your appropriate timezone with `[p]memento tz`.
+
+        Command format: <role> <channel> <time string> | <message>
+
+        You can use common natural language for the time string. For example:
+
+          - @LeagueOfLegends lol-tournament tomorrow at 9pm | Hey all, it's time to start Round 4 of the brackets!
+          - @Subscriber sub-chat in 3 hours | Remember to send in your tickets for the raffle!
+          - @Overwatch ow-chat friday at noon | It's high noon!
+
+        When the time comes, the bot will mention the role along with the custom message.
+        """
         bot_passed, response = self._check_permissions(channel=channel, role=role)
 
         if not bot_passed:
@@ -499,9 +538,10 @@ class Memento(BaseSepCog, commands.Cog):
 
     @_remindrole.command(name="list")
     @commands.guild_only()
+    @checks.mod_or_permissions()
     async def _remindrole_list(self, ctx: Context, channel_or_role: Union[discord.TextChannel, discord.Role, str]):
         """
-        Lists all active reminders for the specified channel or role.
+        Lists all active reminders for the specified channel or role. The list will be DM'd to you.
         """
 
         if isinstance(channel_or_role, discord.TextChannel):
@@ -539,7 +579,13 @@ class Memento(BaseSepCog, commands.Cog):
         return await ErrorReply(f'Channel or Role "{channel_or_role}" not found.').send(ctx)
 
     @_remindrole.command(name="delete", aliases=["del"])
+    @checks.mod_or_permissions()
     async def _remindrole_delete(self, ctx: Context, id_: str):
+        """
+        Deletes a role/channel reminder for the given ID.
+
+        You can get the ID of the reminder by using the `[p]remindrole list` command.
+        """
 
         for channel_id, channel_reminders in self.channel_reminder_cache.items():
             for cr in channel_reminders:
